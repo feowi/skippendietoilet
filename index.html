@@ -7,7 +7,7 @@
   body {
     margin: 0;
     overflow: hidden;
-    background: url('https://i.imgur.com/yHoT8kZ.png') no-repeat center center fixed; /* leuke achtergrondafbeelding */
+    background: url('https://i.imgur.com/yHoT8kZ.png') no-repeat center center fixed;
     background-size: cover;
     font-family: Arial, sans-serif;
   }
@@ -18,7 +18,7 @@
     border: 4px solid #fff;
     box-shadow: 0 0 20px #fff;
   }
-  #score {
+  #score, #level, #upgrades {
     color: #fff;
     position: absolute;
     top: 10px;
@@ -27,18 +27,24 @@
     font-weight: bold;
     text-shadow: 2px 2px 4px #000;
   }
+  #level { top: 40px; }
+  #upgrades { top: 70px; font-size: 16px; }
 </style>
 </head>
 <body>
 <div id="score">Score: 0</div>
+<div id="level">Level: 1</div>
+<div id="upgrades">Upgrades: Geen</div>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <audio id="plopSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+<audio id="powerUpSound" src="https://www.soundjay.com/button/beep-09.wav"></audio>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const plopSound = document.getElementById('plopSound');
+const powerUpSound = document.getElementById('powerUpSound');
 
 const playerImg = new Image();
 playerImg.src = 'https://cdn-icons-png.flaticon.com/512/1946/1946488.png';
@@ -49,20 +55,45 @@ toiletImg.src = 'https://cdn-icons-png.flaticon.com/512/1048/1048953.png';
 let player = { x: 100, y: 100, size: 50, speed: 5 };
 let toilets = [];
 let score = 0;
+let level = 1;
+let upgrades = '';
 let shake = 0;
+let powerUps = [];
+let powerUpActive = false;
+let powerUpTimer = 0;
 
-// Maak 7 willekeurige toiletten
-for (let i = 0; i < 7; i++) {
-  toilets.push({
-    x: Math.random() * (canvas.width - 50),
-    y: Math.random() * (canvas.height - 50),
-    size: 50,
-    color: getRandomColor(),
-    dir: Math.random() < 0.5 ? 1 : -1,
-    speed: 1 + Math.random() * 1.5 // sommige toiletten bewegen sneller
+// Init toiletten
+function createToilets(num) {
+  toilets = [];
+  for (let i = 0; i < num; i++) {
+    toilets.push({
+      x: Math.random() * (canvas.width - 50),
+      y: Math.random() * (canvas.height - 50),
+      size: 50,
+      color: getRandomColor(),
+      dir: Math.random() < 0.5 ? 1 : -1,
+      speed: 1 + Math.random() * (1.5 + level * 0.2)
+    });
+  }
+}
+
+// Init power-ups
+function createPowerUp() {
+  powerUps.push({
+    x: Math.random() * (canvas.width - 30),
+    y: Math.random() * (canvas.height - 30),
+    size: 30,
+    type: Math.random() < 0.5 ? 'speed' : 'score'
   });
 }
 
+// Random kleur
+function getRandomColor() {
+  const colors = ['#ffb703', '#fb8500', '#ff006e', '#8338ec', '#3a86ff', '#06d6a0', '#118ab2'];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// Controls
 document.addEventListener('keydown', (e) => {
   switch (e.key) {
     case 'ArrowUp': player.y -= player.speed; break;
@@ -72,13 +103,9 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-function getRandomColor() {
-  const colors = ['#ffb703', '#fb8500', '#ff006e', '#8338ec', '#3a86ff', '#06d6a0', '#118ab2'];
-  return colors[Math.floor(Math.random() * colors.length)];
-}
-
+// Hoofd-loop
 function draw() {
-  // Schud-effect als geraakt
+  // Schud-effect
   if (shake > 0) {
     ctx.setTransform(1, 0, 0, 1, Math.random() * shake - shake / 2, Math.random() * shake - shake / 2);
     shake -= 0.5;
@@ -86,54 +113,97 @@ function draw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
-  // Achtergrond
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Speler tekenen
+  // Speler
   ctx.drawImage(playerImg, player.x, player.y, player.size, player.size);
 
-  // Toiletten tekenen en bewegen
+  // Toiletten
   toilets.forEach((toilet) => {
     toilet.x += toilet.dir * toilet.speed;
-    if (toilet.x <= 0 || toilet.x + toilet.size >= canvas.width) {
-      toilet.dir *= -1;
-    }
-
-    // Kleur overlay
+    if (toilet.x <= 0 || toilet.x + toilet.size >= canvas.width) toilet.dir *= -1;
     ctx.fillStyle = toilet.color;
     ctx.fillRect(toilet.x, toilet.y, toilet.size, toilet.size);
-
-    // Toilet afbeelding
     ctx.drawImage(toiletImg, toilet.x, toilet.y, toilet.size, toilet.size);
   });
 
+  // Power-ups
+  powerUps.forEach((p) => {
+    ctx.fillStyle = p.type === 'speed' ? 'lime' : 'gold';
+    ctx.beginPath();
+    ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size/2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Power-up timer
+  if (powerUpActive) {
+    powerUpTimer--;
+    if (powerUpTimer <= 0) {
+      player.speed = 5;
+      powerUpActive = false;
+      upgrades = 'Geen';
+      document.getElementById('upgrades').textContent = 'Upgrades: ' + upgrades;
+    }
+  }
+
   checkCollision();
+  checkPowerUpCollision();
+
   requestAnimationFrame(draw);
 }
 
 function checkCollision() {
   toilets.forEach((toilet) => {
-    if (
-      player.x < toilet.x + toilet.size &&
-      player.x + player.size > toilet.x &&
-      player.y < toilet.y + toilet.size &&
-      player.y + player.size > toilet.y
-    ) {
-      // Raak!
+    if (player.x < toilet.x + toilet.size &&
+        player.x + player.size > toilet.x &&
+        player.y < toilet.y + toilet.size &&
+        player.y + player.size > toilet.y) {
       plopSound.currentTime = 0;
       plopSound.play();
       score++;
       document.getElementById('score').textContent = 'Score: ' + score;
-      shake = 10; // Schud het scherm!
-
-      // Verplaats toilet en verander kleur
+      shake = 10;
       toilet.x = Math.random() * (canvas.width - toilet.size);
       toilet.y = Math.random() * (canvas.height - toilet.size);
       toilet.color = getRandomColor();
+
+      // Nieuw level
+      if (score % 10 === 0) {
+        level++;
+        document.getElementById('level').textContent = 'Level: ' + level;
+        createToilets(5 + level);
+        createPowerUp();
+      }
     }
   });
 }
 
+function checkPowerUpCollision() {
+  powerUps.forEach((p, index) => {
+    if (player.x < p.x + p.size &&
+        player.x + player.size > p.x &&
+        player.y < p.y + p.size &&
+        player.y + player.size > p.y) {
+      powerUpSound.currentTime = 0;
+      powerUpSound.play();
+      if (p.type === 'speed') {
+        player.speed = 10;
+        powerUpActive = true;
+        powerUpTimer = 300; // Frames
+        upgrades = 'Snelheid!';
+      } else if (p.type === 'score') {
+        score += 5;
+        document.getElementById('score').textContent = 'Score: ' + score;
+        upgrades = 'Extra punten!';
+      }
+      document.getElementById('upgrades').textContent = 'Upgrades: ' + upgrades;
+      powerUps.splice(index, 1);
+    }
+  });
+}
+
+// Start
+createToilets(7);
 draw();
 </script>
 </body>
