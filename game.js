@@ -17,7 +17,8 @@ const shopItemsList = document.getElementById('shop-items');
 const closeShopBtn = document.getElementById('close-shop');
 const closeSettingsBtn = document.getElementById('close-settings');
 const toggleSoundCheckbox = document.getElementById('toggle-sound');
-const gameMessage = document.getElementById('game-message'); // voor melding
+const gameMessage = document.getElementById('game-message');
+const coinsEl = document.getElementById('coins'); // extra coins display
 
 // Geluiden
 const plopSound = document.getElementById('plopSound');
@@ -38,7 +39,7 @@ bossImg.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png';
 // Variabelen
 let player = { 
   x: 100, y: 100, size: 50, speed: 5, health: 100, maxHealth: 100,
-  weapon: 1, armor: 0, coins: 0, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
+  weapon: 1, armor: 0, coins: 500, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
 };
 let toilets = [];
 let powerUps = [];
@@ -52,21 +53,43 @@ let highscore = localStorage.getItem('highscore') || 0;
 let keys = {};
 let confettiParticles = [];
 let lastSide = 'left';
+let regenUpgradeCount = 0; // voor prijsverhoging
+
+// Shop items met dynamische prijs bij Health Regen
 let shopItems = [
-  { name: 'Sneller', price: 100, desc: 'Verhoogt snelheid', apply: () => { player.speed += 2; upgrades = 'Sneller'; } },
-  { name: 'Wapen Upgrade', price: 200, desc: 'Verhoogt wapen damage', apply: () => { player.weapon += 1; upgrades = 'Wapen Upgrade'; } },
-  { name: 'Health Regen', price: 0, desc: 'Regeneratie van gezondheid', apply: () => { 
+  { 
+    name: 'Sneller', 
+    basePrice: 100, 
+    desc: 'Verhoogt snelheid', 
+    apply: () => { player.speed += 2; upgrades = 'Sneller'; } 
+  },
+  { 
+    name: 'Wapen Upgrade', 
+    basePrice: 200, 
+    desc: 'Verhoogt wapen damage', 
+    apply: () => { player.weapon += 1; upgrades = 'Wapen Upgrade'; } 
+  },
+  { 
+    name: 'Health Regen', 
+    basePrice: 0,  // eerste keer gratis
+    desc: 'Gezondheid regeneratie', 
+    apply: () => { 
       player.hasRegen = true; 
       upgrades = 'Health Regen'; 
-    }, getPrice: (count) => 50 * (count + 1) }, // prijs wordt steeds hoger
-  { name: 'Score Booster', price: 150, desc: 'Verdubbelt score punten', apply: () => { 
+      regenUpgradeCount++;
+    },
+    getPrice: () => regenUpgradeCount === 0 ? 0 : 50 * regenUpgradeCount
+  },
+  { 
+    name: 'Score Booster', 
+    basePrice: 150, 
+    desc: 'Verdubbelt score punten', 
+    apply: () => { 
       player.scoreMultiplier = 2; 
       upgrades = 'Score Booster'; 
-    } }
+    } 
+  }
 ];
-
-// Houd bij hoeveel health regen upgrades gekocht zijn voor prijsverhoging
-let regenUpgradeCount = 0;
 
 // Event listeners
 document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
@@ -76,7 +99,11 @@ shopBtn.addEventListener('click', () => {
   fillShop();
   shopModal.classList.add('visible');
   shopModal.classList.remove('hidden');
+  // Zorg dat settings dicht is
+  settingsModal.classList.remove('visible');
+  settingsModal.classList.add('hidden');
 });
+
 closeShopBtn.addEventListener('click', () => {
   shopModal.classList.add('hidden');
   shopModal.classList.remove('visible');
@@ -85,7 +112,11 @@ closeShopBtn.addEventListener('click', () => {
 settingsBtn.addEventListener('click', () => {
   settingsModal.classList.add('visible');
   settingsModal.classList.remove('hidden');
+  // Zorg dat shop dicht is
+  shopModal.classList.remove('visible');
+  shopModal.classList.add('hidden');
 });
+
 closeSettingsBtn.addEventListener('click', () => {
   settingsModal.classList.add('hidden');
   settingsModal.classList.remove('visible');
@@ -107,15 +138,6 @@ function createToilets(num) {
       health: 5 + level * 2
     });
   }
-}
-
-function createPowerUp() {
-  powerUps.push({
-    x: Math.random() * (canvas.width - 30),
-    y: Math.random() * (canvas.height - 30),
-    size: 30,
-    type: Math.random() < 0.5 ? 'speed' : 'score'
-  });
 }
 
 function getRandomColor() {
@@ -168,6 +190,7 @@ function checkCollisions() {
 
         if (t.health <= 0) {
           score += 10 * (player.scoreMultiplier || 1);
+          player.coins += 10; // Verdien coins bij kill
           spawnConfetti(t.x + t.size/2, t.y + t.size/2, '#06d6a0');
           toilets.splice(toilets.indexOf(t), 1);
           createToilets(1);
@@ -239,14 +262,15 @@ function updateUI() {
   healthText.textContent = player.health;
   healthFill.style.width = player.health + '%';
   updateHighscore();
+  coinsEl.textContent = `Coins: ${player.coins}`;
 }
 
 function fillShop() {
   shopItemsList.innerHTML = '';
   shopItems.forEach(item => {
-    let price = item.price;
+    let price = item.basePrice;
     if (item.name === 'Health Regen') {
-      price = item.getPrice ? item.getPrice(regenUpgradeCount) : item.price;
+      price = item.getPrice();
     }
     let li = document.createElement('li');
     li.textContent = `${item.name} - €${price} (${item.desc})`;
@@ -262,12 +286,7 @@ function fillShop() {
 function buyUpgrade(item, price) {
   if (player.coins < price) return;
   player.coins -= price;
-  if (item.name === 'Health Regen') regenUpgradeCount++;
   item.apply();
-  if (item.name === 'Health Regen') {
-    // Upgrade kost meer bij volgende aankoop
-    // Geen verdere actie nodig want price wordt dynamisch berekend
-  }
   updateUI();
   fillShop();
   if (soundOn) powerUpSound.play();
@@ -276,24 +295,19 @@ function buyUpgrade(item, price) {
 function resetGameWithMessage() {
   showGameMessage('Je bent dood! Het spel wordt herstart...', 3000);
   setTimeout(() => {
-    if (lastSide === 'left') {
-      player.x = 20;
-      player.y = canvas.height / 2;
-    } else if (lastSide === 'right') {
-      player.x = canvas.width - 70;
-      player.y = canvas.height / 2;
-    } else if (lastSide === 'top') {
-      player.x = canvas.width / 2;
-      player.y = 20;
-    } else if (lastSide === 'bottom') {
-      player.x = canvas.width / 2;
-      player.y = canvas.height - 70;
-    }
-    player.health = player.maxHealth || 100;
+    player.x = canvas.width / 2 - player.size / 2;
+    player.y = canvas.height / 2 - player.size / 2;
+    player.health = player.maxHealth;
     score = 0;
     level = 1;
     toilets = [];
     createToilets(5);
+    upgrades = 'Geen';
+    regenUpgradeCount = 0;
+    player.hasRegen = false;
+    player.scoreMultiplier = 1;
+    player.speed = 5;
+    player.weapon = 1;
     updateUI();
     clearGameMessage();
   }, 3000);
@@ -323,11 +337,11 @@ function gameLoop() {
   checkCollisions();
 
   // Health regeneratie (indien actief)
-  if (player.hasRegen && player.health < (player.maxHealth || 100)) {
-    if (!player.regenTimer) player.regenTimer = 60; // 60 frames = ~1 sec
+  if (player.hasRegen && player.health < player.maxHealth) {
+    if (!player.regenTimer) player.regenTimer = 60;
     player.regenTimer--;
     if (player.regenTimer <= 0) {
-      player.health = Math.min(player.health + 1, player.maxHealth || 100);
+      player.health = Math.min(player.health + 1, player.maxHealth);
       player.regenTimer = 60;
     }
   }
@@ -337,7 +351,6 @@ function gameLoop() {
   drawConfetti();
 
   if (shake > 0) {
-    ctx.translate(Math.random() * shake, Math.random() * shake);
     shake--;
   }
 
@@ -345,11 +358,10 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// Beginwaarden instellen
 function resetGame() {
   player = { 
-    x: 100, y: 100, size: 50, speed: 5, health: 100, maxHealth: 100,
-    weapon: 1, armor: 0, coins: 0, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
+    x: canvas.width / 2 - 25, y: canvas.height / 2 - 25, size: 50, speed: 5, health: 100, maxHealth: 100,
+    weapon: 1, armor: 0, coins: 500, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
   };
   score = 0;
   level = 1;
@@ -361,6 +373,5 @@ function resetGame() {
   clearGameMessage();
 }
 
-// Start het spel
 resetGame();
 gameLoop();

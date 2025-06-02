@@ -123,6 +123,8 @@ button {
 }
 
 .modal.visible {
+  display: block;
+  opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }
 
@@ -204,3 +206,4 @@ button {
   box-shadow: 0 0 10px #0f0;
   font-weight: 700;
 }
+

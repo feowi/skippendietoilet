@@ -159,7 +159,11 @@
   <!-- Winkel notificatie -->
   <div id="shopMessage"></div>
 
-  <div id="game-message" style="
+<!-- Coins display -->
+<div id="coins" style="position: absolute; top: 50px; left: 10px; color: white; font-family: Arial, sans-serif; font-size: 18px;"></div>
+
+<!-- Game message -->
+<div id="game-message" style="
   position: absolute;
   top: 10px;
   left: 50%;
@@ -173,6 +177,42 @@
   display: none;
   z-index: 1000;
 "></div>
+
+<!-- Shop modal styling -->
+<div id="shop" class="modal hidden" style="
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  width: 280px;
+  height: 400px;
+  background: rgba(0,0,0,0.85);
+  color: white;
+  overflow-y: auto;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 1000;
+">
+  <button id="close-shop" style="float:right;">X</button>
+  <h2>Shop</h2>
+  <ul id="shop-items" style="list-style: none; padding-left: 0;"></ul>
+</div>
+
+<!-- Settings modal styling -->
+<div id="settings" class="modal hidden" style="
+  position: fixed;
+  top: 60px;
+  left: 20px;
+  width: 200px;
+  background: rgba(0,0,0,0.85);
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 1000;
+">
+  <button id="close-settings" style="float:right;">X</button>
+  <h2>Settings</h2>
+  <label><input type="checkbox" id="toggle-sound" checked> Geluid aan</label>
+</div>
 
 
   <script src="game.js"></script>
