@@ -1,12 +1,14 @@
+/* Algemene body styling */
 body {
   margin: 0;
   overflow: hidden;
   background: url('https://i.imgur.com/yHoT8kZ.png') no-repeat center center fixed;
   background-size: cover;
-  font-family: Arial, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: white;
 }
 
+/* Canvas styling */
 #gameCanvas {
   display: block;
   margin: auto;
@@ -15,7 +17,7 @@ body {
   box-shadow: 0 0 20px #fff;
 }
 
-/* UI container met levendiger look */
+/* UI container */
 #ui {
   position: fixed;
   top: 15px;
@@ -26,10 +28,9 @@ body {
   padding: 15px 20px;
   border-radius: 15px;
   box-shadow: 0 0 20px #06d6a0cc;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* Score, level en upgrades */
+/* Algemene tekst styling voor UI */
 #score, #level, #upgrades, #highscore {
   font-weight: 700;
   font-size: 20px;
@@ -49,25 +50,24 @@ body {
   margin-bottom: 12px;
 }
 
-/* Health bar zelf */
 #health-bar {
   width: 180px;
   height: 24px;
   background: linear-gradient(90deg, #400000, #800000);
-  border-radius: 15px;
-  overflow: hidden;
-  box-shadow: inset 0 0 12px #aa0000;
-  flex-shrink: 0;
   border: 2px solid #cc3333;
+  border-radius: 15px;
+  box-shadow: inset 0 0 12px #aa0000;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 #health-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ff4d4d, #ff0000);
   width: 100%;
-  transition: width 0.25s ease-out;
+  background: linear-gradient(90deg, #ff4d4d, #ff0000);
   border-radius: 15px 0 0 15px;
   box-shadow: 0 0 12px #ff0000cc;
+  transition: width 0.25s ease-out;
 }
 
 #health-text {
@@ -79,20 +79,23 @@ body {
 }
 
 /* Buttons */
-#shop-btn, #settings-btn {
-  display: inline-block;
-  margin-right: 10px;
+button {
   padding: 12px 18px;
-  background: linear-gradient(145deg, #008080, #00cccc);
   border: none;
   border-radius: 15px;
   color: white;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-size: 18px;
+  user-select: none;
+}
+
+#shop-btn, #settings-btn {
+  background: linear-gradient(145deg, #008080, #00cccc);
   box-shadow: 0 4px 10px #00ffffaa;
   text-shadow: 0 0 6px #00ffffcc;
-  font-size: 18px;
+  margin-right: 10px;
 }
 
 #shop-btn:hover, #settings-btn:hover {
@@ -101,7 +104,7 @@ body {
   transform: scale(1.05);
 }
 
-/* Modal windows */
+/* Modal vensters */
 .modal {
   position: fixed;
   top: 50%;
@@ -116,7 +119,6 @@ body {
   max-width: 95%;
   z-index: 100;
   transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   user-select: none;
 }
 
@@ -125,8 +127,7 @@ body {
 }
 
 .modal h2 {
-  margin-top: 0;
-  margin-bottom: 20px;
+  margin: 0 0 20px 0;
   font-weight: 800;
   font-size: 26px;
   text-align: center;
@@ -136,7 +137,7 @@ body {
 #shop-items {
   list-style: none;
   padding: 0;
-  margin: 0 0 25px 0;
+  margin-bottom: 25px;
 }
 
 #shop-items li {
@@ -145,11 +146,10 @@ body {
   cursor: pointer;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  transition: background 0.35s ease;
   font-weight: 600;
   font-size: 16px;
   color: #00ffdd;
+  transition: background 0.35s ease;
 }
 
 #shop-items li:hover {
@@ -159,15 +159,8 @@ body {
 
 #close-shop, #close-settings {
   width: 100%;
-  padding: 14px 0;
   background: #007777;
-  border: none;
-  border-radius: 15px;
-  font-weight: 800;
-  cursor: pointer;
   color: #aaffff;
-  transition: background 0.3s ease;
-  font-size: 18px;
   text-shadow: 0 0 6px #00cccccc;
 }
 
@@ -175,4 +168,39 @@ body {
   background: #00cccc;
   color: white;
   box-shadow: 0 0 12px #00ffffdd;
+}
+
+/* Specifieke shop UI styling */
+#shopUI {
+  display: none;
+  position: fixed;
+  top: 50px;
+  right: 20px;
+  background: #222;
+  color: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #000;
+}
+
+#shopUI h3 {
+  margin-top: 0;
+}
+
+#shopUI div {
+  margin-bottom: 10px;
+}
+
+#shopMessage {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f0;
+  color: #000;
+  padding: 10px 20px;
+  border-radius: 8px;
+  display: none;
+  box-shadow: 0 0 10px #0f0;
+  font-weight: 700;
 }
