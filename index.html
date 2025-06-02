@@ -18,51 +18,79 @@
     border: 4px solid #fff;
     box-shadow: 0 0 20px #fff;
   }
-  #score, #level, #upgrades {
+  #score, #level, #upgrades, #health, #highscore, #shop {
     color: #fff;
     position: absolute;
-    top: 10px;
     left: 10px;
-    font-size: 24px;
     font-weight: bold;
     text-shadow: 2px 2px 4px #000;
   }
-  #level { top: 40px; }
+  #score { top: 10px; font-size: 24px; }
+  #level { top: 40px; font-size: 20px; }
   #upgrades { top: 70px; font-size: 16px; }
+  #health { top: 100px; font-size: 16px; }
+  #highscore { top: 130px; font-size: 16px; }
+  #shop { top: 160px; font-size: 16px; cursor: pointer; }
 </style>
 </head>
 <body>
 <div id="score">Score: 0</div>
 <div id="level">Level: 1</div>
 <div id="upgrades">Upgrades: Geen</div>
+<div id="health">Health: 100</div>
+<div id="highscore">Highscore: 0</div>
+<div id="shop">🛒 Winkel openen</div>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <audio id="plopSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
 <audio id="powerUpSound" src="https://www.soundjay.com/button/beep-09.wav"></audio>
+<audio id="bossSound" src="https://www.soundjay.com/button/beep-04.wav"></audio>
 
 <script>
+// Canvas
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
+// Elementen
 const plopSound = document.getElementById('plopSound');
 const powerUpSound = document.getElementById('powerUpSound');
+const bossSound = document.getElementById('bossSound');
 
+// Afbeeldingen
 const playerImg = new Image();
 playerImg.src = 'https://cdn-icons-png.flaticon.com/512/1946/1946488.png';
-
 const toiletImg = new Image();
 toiletImg.src = 'https://cdn-icons-png.flaticon.com/512/1048/1048953.png';
+const bossImg = new Image();
+bossImg.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png';
 
-let player = { x: 100, y: 100, size: 50, speed: 5 };
+// Variabelen
+let player = { x: 100, y: 100, size: 50, speed: 5, health: 100, weapon: 1, armor: 0 };
 let toilets = [];
+let powerUps = [];
 let score = 0;
 let level = 1;
 let upgrades = '';
 let shake = 0;
-let powerUps = [];
 let powerUpActive = false;
 let powerUpTimer = 0;
+let highscore = localStorage.getItem('highscore') || 0;
+let keys = {};
+let confettiParticles = [];
+let shopOpen = false;
+let maps = [
+  'https://i.imgur.com/yHoT8kZ.png',
+  'https://i.imgur.com/qmd6CO5.jpeg',
+  'https://i.imgur.com/QtQR6sF.jpeg'
+];
 
-// Init toiletten
+// Event Listeners
+document.addEventListener('keydown', (e) => keys[e.key] = true);
+document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+document.getElementById('shop').addEventListener('click', openShop);
+
+// Functies
 function createToilets(num) {
   toilets = [];
   for (let i = 0; i < num; i++) {
@@ -72,12 +100,12 @@ function createToilets(num) {
       size: 50,
       color: getRandomColor(),
       dir: Math.random() < 0.5 ? 1 : -1,
-      speed: 1 + Math.random() * (1.5 + level * 0.2)
+      speed: 1 + Math.random() * (1.5 + level * 0.2),
+      health: 20 + level * 2
     });
   }
 }
 
-// Init power-ups
 function createPowerUp() {
   powerUps.push({
     x: Math.random() * (canvas.width - 30),
@@ -87,95 +115,72 @@ function createPowerUp() {
   });
 }
 
-// Random kleur
 function getRandomColor() {
   const colors = ['#ffb703', '#fb8500', '#ff006e', '#8338ec', '#3a86ff', '#06d6a0', '#118ab2'];
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// Controls
-document.addEventListener('keydown', (e) => {
-  switch (e.key) {
-    case 'ArrowUp': player.y -= player.speed; break;
-    case 'ArrowDown': player.y += player.speed; break;
-    case 'ArrowLeft': player.x -= player.speed; break;
-    case 'ArrowRight': player.x += player.speed; break;
-  }
-});
-
-// Hoofd-loop
-function draw() {
-  // Schud-effect
-  if (shake > 0) {
-    ctx.setTransform(1, 0, 0, 1, Math.random() * shake - shake / 2, Math.random() * shake - shake / 2);
-    shake -= 0.5;
-  } else {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-  }
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Speler
-  ctx.drawImage(playerImg, player.x, player.y, player.size, player.size);
-
-  // Toiletten
-  toilets.forEach((toilet) => {
-    toilet.x += toilet.dir * toilet.speed;
-    if (toilet.x <= 0 || toilet.x + toilet.size >= canvas.width) toilet.dir *= -1;
-    ctx.fillStyle = toilet.color;
-    ctx.fillRect(toilet.x, toilet.y, toilet.size, toilet.size);
-    ctx.drawImage(toiletImg, toilet.x, toilet.y, toilet.size, toilet.size);
-  });
-
-  // Power-ups
-  powerUps.forEach((p) => {
-    ctx.fillStyle = p.type === 'speed' ? 'lime' : 'gold';
-    ctx.beginPath();
-    ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size/2, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Power-up timer
-  if (powerUpActive) {
-    powerUpTimer--;
-    if (powerUpTimer <= 0) {
-      player.speed = 5;
-      powerUpActive = false;
-      upgrades = 'Geen';
-      document.getElementById('upgrades').textContent = 'Upgrades: ' + upgrades;
-    }
-  }
-
-  checkCollision();
-  checkPowerUpCollision();
-
-  requestAnimationFrame(draw);
+function movePlayer() {
+  if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
+  if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
+  if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+  if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
 }
 
 function checkCollision() {
-  toilets.forEach((toilet) => {
+  toilets.forEach((toilet, i) => {
     if (player.x < toilet.x + toilet.size &&
         player.x + player.size > toilet.x &&
         player.y < toilet.y + toilet.size &&
         player.y + player.size > toilet.y) {
+      toilet.health -= player.weapon * 5;
       plopSound.currentTime = 0;
       plopSound.play();
-      score++;
-      document.getElementById('score').textContent = 'Score: ' + score;
       shake = 10;
-      toilet.x = Math.random() * (canvas.width - toilet.size);
-      toilet.y = Math.random() * (canvas.height - toilet.size);
-      toilet.color = getRandomColor();
+      if (toilet.health <= 0) {
+        score++;
+        document.getElementById('score').textContent = 'Score: ' + score;
+        toilet.x = Math.random() * (canvas.width - toilet.size);
+        toilet.y = Math.random() * (canvas.height - toilet.size);
+        toilet.health = 20 + level * 2;
+        toilet.color = getRandomColor();
 
-      // Nieuw level
-      if (score % 10 === 0) {
-        level++;
-        document.getElementById('level').textContent = 'Level: ' + level;
-        createToilets(5 + level);
-        createPowerUp();
+        if (score % 10 === 0) {
+          level++;
+          document.getElementById('level').textContent = 'Level: ' + level;
+          createToilets(5 + level);
+          createPowerUp();
+          confetti();
+          changeMap();
+        }
+
+        if (level % 15 === 0) spawnBoss();
       }
     }
   });
+}
+
+function spawnBoss() {
+  bossSound.currentTime = 0;
+  bossSound.play();
+  toilets.push({
+    x: canvas.width / 2 - 75,
+    y: 50,
+    size: 150,
+    color: 'red',
+    dir: 1,
+    speed: 2 + level * 0.2,
+    health: 300 + level * 20,
+    boss: true
+  });
+}
+
+function changeMap() {
+  if (level % 5 === 0) {
+    const newBg = maps[(level/5 - 1) % maps.length];
+    document.body.style.background = `url('${newBg}') no-repeat center center fixed`;
+    document.body.style.backgroundSize = 'cover';
+  }
 }
 
 function checkPowerUpCollision() {
@@ -189,7 +194,7 @@ function checkPowerUpCollision() {
       if (p.type === 'speed') {
         player.speed = 10;
         powerUpActive = true;
-        powerUpTimer = 300; // Frames
+        powerUpTimer = 300;
         upgrades = 'Snelheid!';
       } else if (p.type === 'score') {
         score += 5;
@@ -202,7 +207,102 @@ function checkPowerUpCollision() {
   });
 }
 
+function updateHighscore() {
+  if (score > highscore) {
+    highscore = score;
+    localStorage.setItem('highscore', highscore);
+  }
+  document.getElementById('highscore').textContent = 'Highscore: ' + highscore;
+}
+
+function confetti() {
+  for (let i = 0; i < 100; i++) {
+    confettiParticles.push({
+      x: Math.random() * canvas.width,
+      y: -10,
+      size: Math.random() * 5 + 2,
+      speed: Math.random() * 3 + 2,
+      color: getRandomColor()
+    });
+  }
+}
+
+function drawConfetti() {
+  confettiParticles.forEach((c, i) => {
+    ctx.fillStyle = c.color;
+    ctx.fillRect(c.x, c.y, c.size, c.size);
+    c.y += c.speed;
+    if (c.y > canvas.height) confettiParticles.splice(i, 1);
+  });
+}
+
+function openShop() {
+  let item = prompt("🛒 Koop iets:\n1. Wapen upgrade (20 punten)\n2. Armor upgrade (15 punten)");
+  if (item === '1' && score >= 20) {
+    player.weapon++;
+    upgrades = 'Wapen Lv. ' + player.weapon;
+    document.getElementById('upgrades').textContent = 'Upgrades: ' + upgrades;
+    score -= 20;
+  } else if (item === '2' && score >= 15) {
+    player.armor++;
+    upgrades = 'Armor Lv. ' + player.armor;
+    document.getElementById('upgrades').textContent = 'Upgrades: ' + upgrades;
+    score -= 15;
+  } else {
+    alert("Niet genoeg punten!");
+  }
+  document.getElementById('score').textContent = 'Score: ' + score;
+}
+
+function draw() {
+  if (shake > 0) {
+    ctx.setTransform(1, 0, 0, 1, Math.random() * shake - shake/2, Math.random() * shake - shake/2);
+    shake -= 0.5;
+  } else ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  movePlayer();
+
+  ctx.drawImage(playerImg, player.x, player.y, player.size, player.size);
+
+  toilets.forEach((toilet) => {
+    ctx.fillStyle = toilet.color;
+    ctx.fillRect(toilet.x, toilet.y, toilet.size, toilet.size);
+    if (toilet.boss) {
+      ctx.drawImage(bossImg, toilet.x, toilet.y, toilet.size, toilet.size);
+    } else {
+      ctx.drawImage(toiletImg, toilet.x, toilet.y, toilet.size, toilet.size);
+    }
+    toilet.x += toilet.dir * toilet.speed;
+    if (toilet.x <= 0 || toilet.x + toilet.size >= canvas.width) toilet.dir *= -1;
+  });
+
+  powerUps.forEach((p) => {
+    ctx.fillStyle = p.type === 'speed' ? 'lime' : 'gold';
+    ctx.beginPath();
+    ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size/2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  if (powerUpActive) {
+    powerUpTimer--;
+    if (powerUpTimer <= 0) {
+      player.speed = 5;
+      powerUpActive = false;
+      upgrades = 'Geen';
+      document.getElementById('upgrades').textContent = 'Upgrades: ' + upgrades;
+    }
+  }
+
+  drawConfetti();
+  checkCollision();
+  checkPowerUpCollision();
+  updateHighscore();
+  requestAnimationFrame(draw);
+}
+
 // Start
+document.getElementById('highscore').textContent = 'Highscore: ' + highscore;
 createToilets(7);
 draw();
 </script>
