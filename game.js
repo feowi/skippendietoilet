@@ -34,7 +34,7 @@ const bossImg = new Image();
 bossImg.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png';
 
 // Variabelen
-let player = { x: 100, y: 100, size: 50, speed: 5, health: 100, weapon: 1, armor: 0 };
+let player = { x: 100, y: 100, size: 50, speed: 5, health: 100, weapon: 1, armor: 0, coins: 0 };
 let toilets = [];
 let powerUps = [];
 let score = 0;
@@ -46,75 +46,11 @@ let powerUpTimer = 0;
 let highscore = localStorage.getItem('highscore') || 0;
 let keys = {};
 let confettiParticles = [];
-let maps = [
-  'https://i.imgur.com/yHoT8kZ.png',
-  'https://i.imgur.com/qmd6CO5.jpeg',
-  'https://i.imgur.com/QtQR6sF.jpeg'
+let lastSide = 'left';
+let shopItems = [
+  { name: 'Sneller', price: 100, desc: 'Verhoogt snelheid', apply: () => { player.speed += 2; upgrades = 'Sneller'; } },
+  { name: 'Wapen Upgrade', price: 200, desc: 'Verhoogt wapen damage', apply: () => { player.weapon += 1; upgrades = 'Wapen Upgrade'; } }
 ];
-
-function updateShopUI() {
-  // voorbeeld code om UI te updaten, bijvoorbeeld:
-  document.getElementById('shopWeaponsCount').textContent = player.weapon;
-  document.getElementById('shopArmorCount').textContent = player.armor;
-  // etc.
-}
-
-function showTopNotification(msg) {
-  const notif = document.getElementById('top-notification');
-  notif.textContent = msg;
-  notif.style.opacity = '1';
-  notif.style.pointerEvents = 'auto';
-  
-  setTimeout(() => {
-    notif.style.opacity = '0';
-    notif.style.pointerEvents = 'none';
-  }, 10000); // verdwijnt na 10 seconden
-}
-
-function updateShopUI() {
-  const itemsContainer = document.getElementById('shop-items');
-  const boostsContainer = document.getElementById('shop-boosts');
-  itemsContainer.innerHTML = '';
-  boostsContainer.innerHTML = '';
-
-  for (const key in shopItems) {
-    const item = shopItems[key];
-
-    // Maak knop voor elk item
-    const btn = document.createElement('button');
-    btn.textContent = `${item.name} - Prijs: ${item.price} coins - Gekocht: ${item.count}`;
-    btn.style.margin = '8px';
-    btn.style.padding = '10px 20px';
-    btn.style.borderRadius = '10px';
-    btn.style.fontWeight = '600';
-    btn.style.cursor = 'pointer';
-    
-    // Grijs maken als boost in cooldown of geen geld
-    if (item.isBoost && item.cooldown) {
-      btn.disabled = true;
-      btn.textContent += ' (Cooldown...)';
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
-    } else if (player.coins < item.price) {
-      btn.disabled = true;
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
-    } else {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-    }
-
-    btn.onclick = () => buyItem(key);
-
-    // Voeg toe aan boost of normale items container
-    if (item.isBoost) {
-      boostsContainer.appendChild(btn);
-    } else {
-      itemsContainer.appendChild(btn);
-    }
-  }
-}
-
 
 // Event listeners
 document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
@@ -143,9 +79,7 @@ toggleSoundCheckbox.addEventListener('change', e => {
   soundOn = e.target.checked;
 });
 
-// Pas createToilets aan om health te fixen:
 function createToilets(num) {
-  toilets = toilets.concat([]);
   for (let i = 0; i < num; i++) {
     toilets.push({
       x: Math.random() * (canvas.width - 50),
@@ -154,7 +88,7 @@ function createToilets(num) {
       color: getRandomColor(),
       dir: Math.random() < 0.5 ? 1 : -1,
       speed: 0.8 + Math.random() * (1.0 + level * 0.1),
-      health: 5 + level * 2  // begin 5 health en beetje groei per level
+      health: 5 + level * 2
     });
   }
 }
@@ -179,11 +113,15 @@ function movePlayer() {
   if (keys['arrowleft'] || keys['a']) player.x -= player.speed;
   if (keys['arrowright'] || keys['d']) player.x += player.speed;
 
-  // Houd player binnen canvas
   if (player.x < 0) player.x = 0;
   if (player.y < 0) player.y = 0;
   if (player.x > canvas.width - player.size) player.x = canvas.width - player.size;
   if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
+
+  if (player.x < canvas.width / 3) lastSide = 'left';
+  else if (player.x > canvas.width * 2 / 3) lastSide = 'right';
+  else if (player.y < canvas.height / 3) lastSide = 'top';
+  else if (player.y > canvas.height * 2 / 3) lastSide = 'bottom';
 }
 
 function drawPlayer() {
@@ -203,69 +141,15 @@ function updateToilets() {
   });
 }
 
-// Bijvoorbeeld detecteer links/rechts kant van het canvas:
-if(player.x < canvas.width / 3) lastSide = 'left';
-else if(player.x > canvas.width * 2 / 3) lastSide = 'right';
-else if(player.y < canvas.height / 3) lastSide = 'top';
-else if(player.y > canvas.height * 2 / 3) lastSide = 'bottom';
-
-// Functie om popup te tonen en wachten op ok
-function showDeathPopup() {
-  const popup = document.getElementById('death-popup');
-  popup.style.display = 'block';
-  return new Promise(resolve => {
-    const okBtn = document.getElementById('death-ok-btn');
-    function onOk() {
-      okBtn.removeEventListener('click', onOk);
-      popup.style.display = 'none';
-      resolve();
-    }
-    okBtn.addEventListener('click', onOk);
-  });
-}
-
-// Pas resetGame aan om popup te gebruiken en daarna speler te verplaatsen naar laatste kant
-async function resetGame() {
-  await showDeathPopup();
-  
-  // Hier verplaats speler naar lastSide (voorbeeld: left/right/top/bottom)
-  if(lastSide === 'left') {
-    player.x = 20;
-    player.y = canvas.height / 2;
-  } else if(lastSide === 'right') {
-    player.x = canvas.width - 70;
-    player.y = canvas.height / 2;
-  } else if(lastSide === 'top') {
-    player.x = canvas.width / 2;
-    player.y = 20;
-  } else if(lastSide === 'bottom') {
-    player.x = canvas.width / 2;
-    player.y = canvas.height - 70;
-  }
-  
-  // Reset andere speler stats
-  player.health = 100;
-  score = 0;
-  level = 1;
-  toilets = [];
-  createToilets(5);
-  updateShopUI();
-  updateUI();
-}
-
-// Damage cooldown fix (zorgt dat toilet schade cooldown werkt)
 let lastDamageTime = 0;
-
 function checkCollisions() {
   const now = Date.now();
   toilets.forEach(t => {
     if (rectsIntersect(player, t)) {
-      if (now - lastDamageTime > 500) {  // cooldown van 500 ms
-        player.health -= 15;  // damage value player neemt op zich
+      if (now - lastDamageTime > 500) {
+        player.health -= 15;
+        t.health -= 15;
 
-        // Schade aan toilet
-        t.health -= 15;  // player damage op toilet
-        
         if (t.health <= 0) {
           score += 10;
           spawnConfetti(t.x + t.size/2, t.y + t.size/2, '#06d6a0');
@@ -282,19 +166,17 @@ function checkCollisions() {
         updateUI();
 
         if (player.health <= 0) {
-          resetGame();
+          resetGameWithPopup();
         }
       }
     }
   });
 }
 
-
-
 function rectsIntersect(a, b) {
-  return !(b.x > a.x + a.size || 
-           b.x + b.size < a.x || 
-           b.y > a.y + a.size || 
+  return !(b.x > a.x + a.size ||
+           b.x + b.size < a.x ||
+           b.y > a.y + a.size ||
            b.y + b.size < a.y);
 }
 
@@ -333,23 +215,6 @@ function updateHighscore() {
   highscoreEl.textContent = 'Highscore: ' + highscore;
 }
 
-function resetGame() {
-  player.x = 100;
-  player.y = 100;
-  player.health = 100;
-  player.speed = 5;
-  player.weapon = 1;
-  player.armor = 0;
-  score = 0;
-  level = 1;
-  upgrades = 'Geen';
-  toilets = [];
-  powerUps = [];
-  confettiParticles = [];
-  createToilets(3); // minder toiletten in het begin
-  updateUI();
-}
-
 function updateUI() {
   scoreEl.textContent = 'Score: ' + score;
   levelEl.textContent = 'Level: ' + level;
@@ -359,7 +224,6 @@ function updateUI() {
   updateHighscore();
 }
 
-// Shop UI vullen
 function fillShop() {
   shopItemsList.innerHTML = '';
   shopItems.forEach(item => {
@@ -383,12 +247,46 @@ function fillShop() {
   });
 }
 
-// Main game loop
+function showDeathPopup() {
+  const popup = document.getElementById('death-popup');
+  popup.style.display = 'block';
+  return new Promise(resolve => {
+    const okBtn = document.getElementById('death-ok-btn');
+    function onOk() {
+      okBtn.removeEventListener('click', onOk);
+      popup.style.display = 'none';
+      resolve();
+    }
+    okBtn.addEventListener('click', onOk);
+  });
+}
+
+async function resetGameWithPopup() {
+  await showDeathPopup();
+  if (lastSide === 'left') {
+    player.x = 20;
+    player.y = canvas.height / 2;
+  } else if (lastSide === 'right') {
+    player.x = canvas.width - 70;
+    player.y = canvas.height / 2;
+  } else if (lastSide === 'top') {
+    player.x = canvas.width / 2;
+    player.y = 20;
+  } else if (lastSide === 'bottom') {
+    player.x = canvas.width / 2;
+    player.y = canvas.height - 70;
+  }
+  player.health = 100;
+  score = 0;
+  level = 1;
+  toilets = [];
+  createToilets(5);
+  updateUI();
+}
+
 function gameLoop() {
-  // Achtergrond
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Shake effect
   if (shake > 0) {
     const dx = (Math.random() - 0.5) * shake;
     const dy = (Math.random() - 0.5) * shake;
@@ -404,7 +302,6 @@ function gameLoop() {
   drawConfetti();
   checkCollisions();
 
-  // PowerUp timer reset
   if (powerUpActive) {
     powerUpTimer--;
     if (powerUpTimer <= 0) {
@@ -418,24 +315,26 @@ function gameLoop() {
   if (shake > 0) ctx.restore();
 
   updateUI();
-
   requestAnimationFrame(gameLoop);
 }
 
-function showTopNotification(msg) {
-  const notif = document.getElementById('top-notification');
-  notif.textContent = msg;
-  notif.style.opacity = '1';
-  notif.style.pointerEvents = 'auto';
-  
-  setTimeout(() => {
-    notif.style.opacity = '0';
-    notif.style.pointerEvents = 'none';
-  }, 3000); // verdwijnt na 3 seconden
+// Start
+function resetGame() {
+  player.x = 100;
+  player.y = 100;
+  player.health = 100;
+  player.speed = 5;
+  player.weapon = 1;
+  player.armor = 0;
+  score = 0;
+  level = 1;
+  upgrades = 'Geen';
+  toilets = [];
+  powerUps = [];
+  confettiParticles = [];
+  createToilets(3);
+  updateUI();
 }
 
-
-// Start
 resetGame();
 gameLoop();
-
