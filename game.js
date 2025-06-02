@@ -17,6 +17,7 @@ const shopItemsList = document.getElementById('shop-items');
 const closeShopBtn = document.getElementById('close-shop');
 const closeSettingsBtn = document.getElementById('close-settings');
 const toggleSoundCheckbox = document.getElementById('toggle-sound');
+const gameMessage = document.getElementById('game-message'); // voor melding
 
 // Geluiden
 const plopSound = document.getElementById('plopSound');
@@ -24,6 +25,7 @@ const powerUpSound = document.getElementById('powerUpSound');
 const bossSound = document.getElementById('bossSound');
 
 let soundOn = true;
+let deathMessageTimeout = null;
 
 // Afbeeldingen
 const playerImg = new Image();
@@ -34,7 +36,10 @@ const bossImg = new Image();
 bossImg.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png';
 
 // Variabelen
-let player = { x: 100, y: 100, size: 50, speed: 5, health: 100, weapon: 1, armor: 0, coins: 0 };
+let player = { 
+  x: 100, y: 100, size: 50, speed: 5, health: 100, maxHealth: 100,
+  weapon: 1, armor: 0, coins: 0, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
+};
 let toilets = [];
 let powerUps = [];
 let score = 0;
@@ -49,53 +54,19 @@ let confettiParticles = [];
 let lastSide = 'left';
 let shopItems = [
   { name: 'Sneller', price: 100, desc: 'Verhoogt snelheid', apply: () => { player.speed += 2; upgrades = 'Sneller'; } },
-  { name: 'Wapen Upgrade', price: 200, desc: 'Verhoogt wapen damage', apply: () => { player.weapon += 1; upgrades = 'Wapen Upgrade'; } }
+  { name: 'Wapen Upgrade', price: 200, desc: 'Verhoogt wapen damage', apply: () => { player.weapon += 1; upgrades = 'Wapen Upgrade'; } },
+  { name: 'Health Regen', price: 0, desc: 'Regeneratie van gezondheid', apply: () => { 
+      player.hasRegen = true; 
+      upgrades = 'Health Regen'; 
+    }, getPrice: (count) => 50 * (count + 1) }, // prijs wordt steeds hoger
+  { name: 'Score Booster', price: 150, desc: 'Verdubbelt score punten', apply: () => { 
+      player.scoreMultiplier = 2; 
+      upgrades = 'Score Booster'; 
+    } }
 ];
 
-let regenCost = 0; // Beginprijs gratis
-
-shopItems.push(
-  {
-    name: 'Gezonde regeneratie',
-    price: regenCost,
-    desc: 'Regeneert 1 HP per seconde. Prijs stijgt elke keer.',
-    apply: () => {
-      player.hasRegen = true;
-      upgrades = 'Gezonde regeneratie';
-      regenCost = regenCost === 0 ? 50 : regenCost + 50; // na gratis eerst 50 dan steeds duurder
-      // Update de prijs in shop
-      shopItems.find(i => i.name === 'Gezonde regeneratie').price = regenCost;
-    }
-  },
-  {
-    name: 'Snellere score',
-    price: 150,
-    desc: 'Verdubbelt score per toilet',
-    apply: () => {
-      player.scoreMultiplier = 2;
-      upgrades = 'Snellere score';
-    }
-  },
-  {
-    name: 'Extra health bar',
-    price: 300,
-    desc: 'Verhoogt maximale health naar 150',
-    apply: () => {
-      player.maxHealth = 150;
-      if (player.health > 150) player.health = 150;
-      upgrades = 'Extra health bar';
-    }
-  },
-  {
-    name: 'Wapen upgrade +',
-    price: 400,
-    desc: 'Nog meer wapendamage',
-    apply: () => {
-      player.weapon += 2;
-      upgrades = 'Wapen upgrade +';
-    }
-  }
-);
+// Houd bij hoeveel health regen upgrades gekocht zijn voor prijsverhoging
+let regenUpgradeCount = 0;
 
 // Event listeners
 document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
@@ -189,16 +160,16 @@ function updateToilets() {
 let lastDamageTime = 0;
 function checkCollisions() {
   const now = Date.now();
-  toilets.forEach((t, i) => {
+  toilets.forEach(t => {
     if (rectsIntersect(player, t)) {
       if (now - lastDamageTime > 500) {
         player.health -= 15;
         t.health -= 15;
 
         if (t.health <= 0) {
-          score += 10;
+          score += 10 * (player.scoreMultiplier || 1);
           spawnConfetti(t.x + t.size/2, t.y + t.size/2, '#06d6a0');
-          toilets.splice(i, 1);
+          toilets.splice(toilets.indexOf(t), 1);
           createToilets(1);
           if (soundOn) plopSound.play();
         } else {
@@ -209,19 +180,10 @@ function checkCollisions() {
         lastDamageTime = now;
         shake = 8;
         updateUI();
-        
-        // Health regeneratie (indien actief)
-if (player.hasRegen && player.health < (player.maxHealth || 100)) {
-  if (!player.regenTimer) player.regenTimer = 60; // 60 frames ~ 1 seconde
-  player.regenTimer--;
-  if (player.regenTimer <= 0) {
-    player.health = Math.min(player.health + 1, player.maxHealth || 100);
-    player.regenTimer = 60;
-  }
-}
 
         if (player.health <= 0) {
-          resetGameWithPopup();
+          resetGameWithMessage();
+          player.health = 0;
         }
       }
     }
@@ -250,8 +212,7 @@ function spawnConfetti(x, y, color) {
 }
 
 function drawConfetti() {
-  for (let i = confettiParticles.length - 1; i >= 0; i--) {
-    const p = confettiParticles[i];
+  confettiParticles.forEach((p, i) => {
     ctx.fillStyle = p.color;
     ctx.globalAlpha = p.alpha;
     ctx.fillRect(p.x, p.y, p.size, p.size);
@@ -259,7 +220,7 @@ function drawConfetti() {
     p.y += p.speedY;
     p.alpha -= 0.03;
     if (p.alpha <= 0) confettiParticles.splice(i, 1);
-  }
+  });
   ctx.globalAlpha = 1;
 }
 
@@ -283,117 +244,123 @@ function updateUI() {
 function fillShop() {
   shopItemsList.innerHTML = '';
   shopItems.forEach(item => {
-    const li = document.createElement('li');
-    li.textContent = `${item.name} (${item.price} punten) - ${item.desc}`;
-    li.style.cursor = 'pointer';
-    li.addEventListener('click', () => {
-      if (score >= item.price) {
-        score -= item.price;
-        item.apply();
-        updateUI();
-        if (soundOn) powerUpSound.play();
-        alert(`Je hebt ${item.name} gekocht!`);
-        shopModal.classList.remove('visible');
-        shopModal.classList.add('hidden');
-      } else {
-        alert('Niet genoeg punten!');
-      }
-    });
+    let price = item.price;
+    if (item.name === 'Health Regen') {
+      price = item.getPrice ? item.getPrice(regenUpgradeCount) : item.price;
+    }
+    let li = document.createElement('li');
+    li.textContent = `${item.name} - €${price} (${item.desc})`;
+    let btn = document.createElement('button');
+    btn.textContent = 'Koop';
+    btn.disabled = player.coins < price;
+    btn.addEventListener('click', () => buyUpgrade(item, price));
+    li.appendChild(btn);
     shopItemsList.appendChild(li);
   });
 }
 
-function showDeathPopup() {
-  const popup = document.getElementById('death-popup');
-  popup.style.display = 'block';
-  return new Promise(resolve => {
-    const okBtn = document.getElementById('death-ok-btn');
-    function onOk() {
-      okBtn.removeEventListener('click', onOk);
-      popup.style.display = 'none';
-      resolve();
-    }
-    okBtn.addEventListener('click', onOk);
-  });
+function buyUpgrade(item, price) {
+  if (player.coins < price) return;
+  player.coins -= price;
+  if (item.name === 'Health Regen') regenUpgradeCount++;
+  item.apply();
+  if (item.name === 'Health Regen') {
+    // Upgrade kost meer bij volgende aankoop
+    // Geen verdere actie nodig want price wordt dynamisch berekend
+  }
+  updateUI();
+  fillShop();
+  if (soundOn) powerUpSound.play();
 }
 
-async function resetGameWithPopup() {
-  await showDeathPopup();
-  if (lastSide === 'left') {
-    player.x = 20;
-    player.y = canvas.height / 2;
-  } else if (lastSide === 'right') {
-    player.x = canvas.width - 70;
-    player.y = canvas.height / 2;
-  } else if (lastSide === 'top') {
-    player.x = canvas.width / 2;
-    player.y = 20;
-  } else if (lastSide === 'bottom') {
-    player.x = canvas.width / 2;
-    player.y = canvas.height - 70;
+function resetGameWithMessage() {
+  showGameMessage('Je bent dood! Het spel wordt herstart...', 3000);
+  setTimeout(() => {
+    if (lastSide === 'left') {
+      player.x = 20;
+      player.y = canvas.height / 2;
+    } else if (lastSide === 'right') {
+      player.x = canvas.width - 70;
+      player.y = canvas.height / 2;
+    } else if (lastSide === 'top') {
+      player.x = canvas.width / 2;
+      player.y = 20;
+    } else if (lastSide === 'bottom') {
+      player.x = canvas.width / 2;
+      player.y = canvas.height - 70;
+    }
+    player.health = player.maxHealth || 100;
+    score = 0;
+    level = 1;
+    toilets = [];
+    createToilets(5);
+    updateUI();
+    clearGameMessage();
+  }, 3000);
+}
+
+function showGameMessage(text, duration) {
+  if (deathMessageTimeout) clearTimeout(deathMessageTimeout);
+  gameMessage.textContent = text;
+  gameMessage.style.display = 'block';
+  if (duration) {
+    deathMessageTimeout = setTimeout(() => {
+      gameMessage.style.display = 'none';
+    }, duration);
   }
-  player.health = 100;
-  score = 0;
-  level = 1;
-  toilets = [];
-  createToilets(5);
-  updateUI();
+}
+
+function clearGameMessage() {
+  gameMessage.style.display = 'none';
+  if (deathMessageTimeout) clearTimeout(deathMessageTimeout);
 }
 
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (shake > 0) {
-    const dx = (Math.random() - 0.5) * shake;
-    const dy = (Math.random() - 0.5) * shake;
-    ctx.save();
-    ctx.translate(dx, dy);
-    shake--;
-  }
-
   movePlayer();
   updateToilets();
-  drawToilets();
-  drawPlayer();
-  drawConfetti();
   checkCollisions();
 
-  if (powerUpActive) {
-    powerUpTimer--;
-    if (powerUpTimer <= 0) {
-      powerUpActive = false;
-      player.speed = 5;
-      upgrades = 'Geen';
-      updateUI();
+  // Health regeneratie (indien actief)
+  if (player.hasRegen && player.health < (player.maxHealth || 100)) {
+    if (!player.regenTimer) player.regenTimer = 60; // 60 frames = ~1 sec
+    player.regenTimer--;
+    if (player.regenTimer <= 0) {
+      player.health = Math.min(player.health + 1, player.maxHealth || 100);
+      player.regenTimer = 60;
     }
   }
 
-  if (shake > 0) ctx.restore();
+  drawPlayer();
+  drawToilets();
+  drawConfetti();
+
+  if (shake > 0) {
+    ctx.translate(Math.random() * shake, Math.random() * shake);
+    shake--;
+  }
 
   updateUI();
   requestAnimationFrame(gameLoop);
 }
 
-// Start
+// Beginwaarden instellen
 function resetGame() {
-  player.x = 100;
-  player.y = 100;
-  player.health = 100;
-  player.speed = 5;
-  player.weapon = 1;
-  player.armor = 0;
+  player = { 
+    x: 100, y: 100, size: 50, speed: 5, health: 100, maxHealth: 100,
+    weapon: 1, armor: 0, coins: 0, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
+  };
   score = 0;
   level = 1;
-  upgrades = 'Geen';
   toilets = [];
-  powerUps = [];
-  confettiParticles = [];
-  createToilets(3);
+  createToilets(5);
+  upgrades = 'Geen';
+  regenUpgradeCount = 0;
   updateUI();
+  clearGameMessage();
 }
 
+// Start het spel
 resetGame();
-player.hasRegen = false;
-player.scoreMultiplier = 1;
-player.maxHealth = 100;
 gameLoop();
