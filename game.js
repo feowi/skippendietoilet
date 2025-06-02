@@ -52,14 +52,65 @@ let maps = [
   'https://i.imgur.com/QtQR6sF.jpeg'
 ];
 
-// Shop items met prijzen en effecten
-const shopItems = [
-  { id: 'weapon', name: 'Wapen upgrade', price: 20, desc: 'Meer schade', apply() { player.weapon++; upgrades = 'Wapen Lv. ' + player.weapon; } },
-  { id: 'armor', name: 'Armor upgrade', price: 15, desc: 'Minder schade', apply() { player.armor++; upgrades = 'Armor Lv. ' + player.armor; } },
-  { id: 'healthBoost', name: 'Gezondheid boost', price: 25, desc: 'Herstelt 50 health', apply() { player.health = Math.min(100, player.health + 50); } },
-  { id: 'speedBoost', name: 'Snelheid boost', price: 30, desc: 'Snelheid tijdelijk omhoog', apply() {
-    player.speed = 10; powerUpActive = true; powerUpTimer = 300; upgrades = 'Snelheid!'; } }
-];
+updateShopUI();
+
+
+function showTopNotification(msg) {
+  const notif = document.getElementById('top-notification');
+  notif.textContent = msg;
+  notif.style.opacity = '1';
+  notif.style.pointerEvents = 'auto';
+  
+  setTimeout(() => {
+    notif.style.opacity = '0';
+    notif.style.pointerEvents = 'none';
+  }, 10000); // verdwijnt na 10 seconden
+}
+
+function updateShopUI() {
+  const itemsContainer = document.getElementById('shop-items');
+  const boostsContainer = document.getElementById('shop-boosts');
+  itemsContainer.innerHTML = '';
+  boostsContainer.innerHTML = '';
+
+  for (const key in shopItems) {
+    const item = shopItems[key];
+
+    // Maak knop voor elk item
+    const btn = document.createElement('button');
+    btn.textContent = `${item.name} - Prijs: ${item.price} coins - Gekocht: ${item.count}`;
+    btn.style.margin = '8px';
+    btn.style.padding = '10px 20px';
+    btn.style.borderRadius = '10px';
+    btn.style.fontWeight = '600';
+    btn.style.cursor = 'pointer';
+    
+    // Grijs maken als boost in cooldown of geen geld
+    if (item.isBoost && item.cooldown) {
+      btn.disabled = true;
+      btn.textContent += ' (Cooldown...)';
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    } else if (player.coins < item.price) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+
+    btn.onclick = () => buyItem(key);
+
+    // Voeg toe aan boost of normale items container
+    if (item.isBoost) {
+      boostsContainer.appendChild(btn);
+    } else {
+      itemsContainer.appendChild(btn);
+    }
+  }
+}
+
 
 // Event listeners
 document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
@@ -365,6 +416,19 @@ function gameLoop() {
 
   requestAnimationFrame(gameLoop);
 }
+
+function showTopNotification(msg) {
+  const notif = document.getElementById('top-notification');
+  notif.textContent = msg;
+  notif.style.opacity = '1';
+  notif.style.pointerEvents = 'auto';
+  
+  setTimeout(() => {
+    notif.style.opacity = '0';
+    notif.style.pointerEvents = 'none';
+  }, 3000); // verdwijnt na 3 seconden
+}
+
 
 // Start
 resetGame();
