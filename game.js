@@ -148,25 +148,73 @@ function updateToilets() {
   });
 }
 
-// Voeg toe bovenaan:
-let lastDamageTime = 0;
+// Bijvoorbeeld detecteer links/rechts kant van het canvas:
+if(player.x < canvas.width / 3) lastSide = 'left';
+else if(player.x > canvas.width * 2 / 3) lastSide = 'right';
+else if(player.y < canvas.height / 3) lastSide = 'top';
+else if(player.y > canvas.height * 2 / 3) lastSide = 'bottom';
 
+// Functie om popup te tonen en wachten op ok
+function showDeathPopup() {
+  const popup = document.getElementById('death-popup');
+  popup.style.display = 'block';
+  return new Promise(resolve => {
+    const okBtn = document.getElementById('death-ok-btn');
+    function onOk() {
+      okBtn.removeEventListener('click', onOk);
+      popup.style.display = 'none';
+      resolve();
+    }
+    okBtn.addEventListener('click', onOk);
+  });
+}
+
+// Pas resetGame aan om popup te gebruiken en daarna speler te verplaatsen naar laatste kant
+async function resetGame() {
+  await showDeathPopup();
+  
+  // Hier verplaats speler naar lastSide (voorbeeld: left/right/top/bottom)
+  if(lastSide === 'left') {
+    player.x = 20;
+    player.y = canvas.height / 2;
+  } else if(lastSide === 'right') {
+    player.x = canvas.width - 70;
+    player.y = canvas.height / 2;
+  } else if(lastSide === 'top') {
+    player.x = canvas.width / 2;
+    player.y = 20;
+  } else if(lastSide === 'bottom') {
+    player.x = canvas.width / 2;
+    player.y = canvas.height - 70;
+  }
+  
+  // Reset andere speler stats
+  player.health = 100;
+  score = 0;
+  level = 1;
+  toilets = [];
+  createToilets(5);
+  updateUI();
+}
+
+// Damage cooldown fix (zorgt dat toilet schade cooldown werkt)
+let lastDamageTime = 0;
 
 function checkCollisions() {
   const now = Date.now();
   toilets.forEach(t => {
     if (rectsIntersect(player, t)) {
-      if (now - lastDamageTime > 500) { // 500 ms cooldown tussen schade
-        let damage = Math.max(1, 15 - player.armor * 2); // Player doet 15 damage aanvankelijk
-        player.health -= damage;
+      if (now - lastDamageTime > 500) {  // cooldown van 500 ms
+        player.health -= 15;  // damage value player neemt op zich
 
-        // Toiletten krijgen schade van speler's weapon:
-        t.health -= player.weapon * 15; // speler doet 15 damage per aanval (weapon 1 = 15 dmg)
+        // Schade aan toilet
+        t.health -= 15;  // player damage op toilet
+        
         if (t.health <= 0) {
           score += 10;
           spawnConfetti(t.x + t.size/2, t.y + t.size/2, '#06d6a0');
           toilets.splice(toilets.indexOf(t), 1);
-          createToilets(1); // 1 nieuwe toilet erbij
+          createToilets(1);
           if (soundOn) plopSound.play();
         } else {
           spawnConfetti(player.x + player.size/2, player.y + player.size/2, '#e74c3c');
@@ -178,13 +226,13 @@ function checkCollisions() {
         updateUI();
 
         if (player.health <= 0) {
-          alert('Game Over! Je score: ' + score);
           resetGame();
         }
       }
     }
   });
 }
+
 
 
 function rectsIntersect(a, b) {
@@ -321,3 +369,4 @@ function gameLoop() {
 // Start
 resetGame();
 gameLoop();
+
