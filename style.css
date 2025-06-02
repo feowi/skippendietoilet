@@ -1,0 +1,178 @@
+body {
+  margin: 0;
+  overflow: hidden;
+  background: url('https://i.imgur.com/yHoT8kZ.png') no-repeat center center fixed;
+  background-size: cover;
+  font-family: Arial, sans-serif;
+  color: white;
+}
+
+#gameCanvas {
+  display: block;
+  margin: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border: 4px solid #fff;
+  box-shadow: 0 0 20px #fff;
+}
+
+/* UI container met levendiger look */
+#ui {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 20;
+  user-select: none;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 15px 20px;
+  border-radius: 15px;
+  box-shadow: 0 0 20px #06d6a0cc;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Score, level en upgrades */
+#score, #level, #upgrades, #highscore {
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 10px;
+  text-shadow: 1px 1px 4px #000;
+  color: #00ffcc;
+}
+
+/* Health bar container */
+#health-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  color: #ff6666;
+  margin-bottom: 12px;
+}
+
+/* Health bar zelf */
+#health-bar {
+  width: 180px;
+  height: 24px;
+  background: linear-gradient(90deg, #400000, #800000);
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: inset 0 0 12px #aa0000;
+  flex-shrink: 0;
+  border: 2px solid #cc3333;
+}
+
+#health-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4d4d, #ff0000);
+  width: 100%;
+  transition: width 0.25s ease-out;
+  border-radius: 15px 0 0 15px;
+  box-shadow: 0 0 12px #ff0000cc;
+}
+
+#health-text {
+  width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #ff4444;
+  text-shadow: 0 0 8px #ff0000aa;
+}
+
+/* Buttons */
+#shop-btn, #settings-btn {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 12px 18px;
+  background: linear-gradient(145deg, #008080, #00cccc);
+  border: none;
+  border-radius: 15px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px #00ffffaa;
+  text-shadow: 0 0 6px #00ffffcc;
+  font-size: 18px;
+}
+
+#shop-btn:hover, #settings-btn:hover {
+  background: linear-gradient(145deg, #00cccc, #008080);
+  box-shadow: 0 6px 14px #00ffffee;
+  transform: scale(1.05);
+}
+
+/* Modal windows */
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: rgba(10, 30, 30, 0.95);
+  padding: 25px;
+  border-radius: 25px;
+  box-shadow: 0 0 40px #00ccccdd;
+  color: #00ffff;
+  width: 320px;
+  max-width: 95%;
+  z-index: 100;
+  transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  user-select: none;
+}
+
+.modal.visible {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.modal h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-weight: 800;
+  font-size: 26px;
+  text-align: center;
+  text-shadow: 0 0 10px #00ccccbb;
+}
+
+#shop-items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 25px 0;
+}
+
+#shop-items li {
+  padding: 14px 12px;
+  border-bottom: 1px solid #004040;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.35s ease;
+  font-weight: 600;
+  font-size: 16px;
+  color: #00ffdd;
+}
+
+#shop-items li:hover {
+  background: #004d4d;
+  text-shadow: 0 0 6px #00ffffcc;
+}
+
+#close-shop, #close-settings {
+  width: 100%;
+  padding: 14px 0;
+  background: #007777;
+  border: none;
+  border-radius: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #aaffff;
+  transition: background 0.3s ease;
+  font-size: 18px;
+  text-shadow: 0 0 6px #00cccccc;
+}
+
+#close-shop:hover, #close-settings:hover {
+  background: #00cccc;
+  color: white;
+  box-shadow: 0 0 12px #00ffffdd;
+}

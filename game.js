@@ -88,9 +88,9 @@ toggleSoundCheckbox.addEventListener('change', e => {
   soundOn = e.target.checked;
 });
 
-// Functies
+// Pas createToilets aan om health te fixen:
 function createToilets(num) {
-  toilets = [];
+  toilets = toilets.concat([]);
   for (let i = 0; i < num; i++) {
     toilets.push({
       x: Math.random() * (canvas.width - 50),
@@ -98,8 +98,8 @@ function createToilets(num) {
       size: 50,
       color: getRandomColor(),
       dir: Math.random() < 0.5 ? 1 : -1,
-      speed: 0.8 + Math.random() * (1.0 + level * 0.1), // minder snel dan eerst
-      health: 20 + level * 2
+      speed: 0.8 + Math.random() * (1.0 + level * 0.1),
+      health: 5 + level * 2  // begin 5 health en beetje groei per level
     });
   }
 }
@@ -148,23 +148,44 @@ function updateToilets() {
   });
 }
 
+// Voeg toe bovenaan:
+let lastDamageTime = 0;
+
+
 function checkCollisions() {
+  const now = Date.now();
   toilets.forEach(t => {
     if (rectsIntersect(player, t)) {
-      // Minder schade door armor, en toiletten doen minder schade (halve schade tov eerst)
-      let damage = Math.max(1, 10 - player.armor * 2); 
-      player.health -= damage;
-      spawnConfetti(player.x + player.size / 2, player.y + player.size / 2, '#e74c3c');
-      if (soundOn) plopSound.play();
-      shake = 8;
+      if (now - lastDamageTime > 500) { // 500 ms cooldown tussen schade
+        let damage = Math.max(1, 15 - player.armor * 2); // Player doet 15 damage aanvankelijk
+        player.health -= damage;
 
-      if (player.health <= 0) {
-        alert('Game Over! Je score: ' + score);
-        resetGame();
+        // Toiletten krijgen schade van speler's weapon:
+        t.health -= player.weapon * 15; // speler doet 15 damage per aanval (weapon 1 = 15 dmg)
+        if (t.health <= 0) {
+          score += 10;
+          spawnConfetti(t.x + t.size/2, t.y + t.size/2, '#06d6a0');
+          toilets.splice(toilets.indexOf(t), 1);
+          createToilets(1); // 1 nieuwe toilet erbij
+          if (soundOn) plopSound.play();
+        } else {
+          spawnConfetti(player.x + player.size/2, player.y + player.size/2, '#e74c3c');
+          if (soundOn) powerUpSound.play();
+        }
+
+        lastDamageTime = now;
+        shake = 8;
+        updateUI();
+
+        if (player.health <= 0) {
+          alert('Game Over! Je score: ' + score);
+          resetGame();
+        }
       }
     }
   });
 }
+
 
 function rectsIntersect(a, b) {
   return !(b.x > a.x + a.size || 
