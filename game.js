@@ -378,12 +378,8 @@ function updatePowerUps() {
 }
 
 function gameLoop() {
-  // Dag/nacht cyclus
-  dayTime += 0.005;
-  let r = Math.floor(30 + 40 * Math.sin(dayTime));
-  let g = Math.floor(60 + 60 * Math.sin(dayTime + 1));
-  let b = Math.floor(120 + 80 * Math.sin(dayTime + 2));
-  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  // Verwijder de dag/nacht cyclus en gebruik gewoon een effen achtergrondkleur
+  ctx.fillStyle = "#222"; // Donkere achtergrond
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   movePlayer();
@@ -391,13 +387,13 @@ function gameLoop() {
   updatePowerUps();
   checkCollisions();
 
-  // Health regeneratie (indien actief)
+  // Snellere health regeneratie (bijvoorbeeld elke 20 frames ipv 60)
   if (player.hasRegen && player.health < player.maxHealth) {
-    if (!player.regenTimer) player.regenTimer = 60;
+    if (!player.regenTimer) player.regenTimer = 20; // was 60
     player.regenTimer--;
     if (player.regenTimer <= 0) {
       player.health = Math.min(player.health + 1, player.maxHealth);
-      player.regenTimer = 60;
+      player.regenTimer = 20; // was 60
     }
   }
 
