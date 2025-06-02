@@ -52,8 +52,12 @@ let maps = [
   'https://i.imgur.com/QtQR6sF.jpeg'
 ];
 
-updateShopUI();
-
+function updateShopUI() {
+  // voorbeeld code om UI te updaten, bijvoorbeeld:
+  document.getElementById('shopWeaponsCount').textContent = player.weapon;
+  document.getElementById('shopArmorCount').textContent = player.armor;
+  // etc.
+}
 
 function showTopNotification(msg) {
   const notif = document.getElementById('top-notification');
@@ -245,6 +249,7 @@ async function resetGame() {
   level = 1;
   toilets = [];
   createToilets(5);
+  updateShopUI();
   updateUI();
 }
 
