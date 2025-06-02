@@ -94,6 +94,35 @@
   user-select: none;
 "></div>
 
+<div id="shop-items-container">
+  <h2>Items</h2>
+  <div id="shop-items"></div>
+</div>
+
+<div id="shop-boosts-container">
+  <h2>Boosts</h2>
+  <div id="shop-boosts"></div>
+</div>
+
+<div id="shopUI" style="display:none; position:fixed; top:50px; right:20px; background:#222; color:#fff; padding:15px; border-radius:10px; box-shadow:0 0 10px #000;">
+  <h3>🛒 Winkel</h3>
+  <div>
+    <button id="buyWeaponBtn">Wapen upgrade (<span id="weaponPrice">20</span> punten)</button>
+    <span>Aantal: <span id="shopWeaponsCount">0</span></span>
+  </div>
+  <div>
+    <button id="buyArmorBtn">Armor upgrade (<span id="armorPrice">15</span> punten)</button>
+    <span>Aantal: <span id="shopArmorCount">0</span></span>
+  </div>
+  <div>
+    <button id="buySpeedBoostBtn" disabled>Speed boost (<span id="speedBoostPrice">30</span> punten)</button>
+    <span id="speedBoostCooldown">Cooldown: 0</span>
+  </div>
+  <button id="closeShopBtn">Sluiten</button>
+</div>
+
+<div id="shopMessage" style="position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#0f0; color:#000; padding:10px 20px; border-radius:8px; display:none;"></div>
+
 
   <script src="game.js"></script>
 </body>
