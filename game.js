@@ -42,7 +42,7 @@ let player = {
   weapon: 1, armor: 0, coins: 500, hasRegen: false, regenTimer: 60, scoreMultiplier: 1
 };
 let toilets = [];
-let powerUps = [];
+let powerUps = []; // Power-ups array (staat al in je code)
 let score = 0;
 let level = 1;
 let upgrades = 'Geen';
@@ -54,6 +54,8 @@ let keys = {};
 let confettiParticles = [];
 let lastSide = 'left';
 let regenUpgradeCount = 0; // voor prijsverhoging
+let dayTime = 0; // Voor dag/nacht cyclus
+let shieldColor = '#00bfff'; // Kleur voor schild power-up
 
 // Shop items met dynamische prijs bij Health Regen
 let shopItems = [
@@ -88,6 +90,16 @@ let shopItems = [
       player.scoreMultiplier = 2; 
       upgrades = 'Score Booster'; 
     } 
+  },
+  {
+    name: 'Schild',
+    basePrice: 250,
+    desc: 'Vermindert schade 10 seconden',
+    apply: () => {
+      player.hasShield = true;
+      upgrades = 'Schild';
+      player.shieldTimer = 600; // 10 seconden bij 60 FPS
+    }
   }
 ];
 
@@ -128,14 +140,16 @@ toggleSoundCheckbox.addEventListener('change', e => {
 
 function createToilets(num) {
   for (let i = 0; i < num; i++) {
+    let isFast = Math.random() < 0.2; // 20% kans op snelle toilet
     toilets.push({
       x: Math.random() * (canvas.width - 50),
       y: Math.random() * (canvas.height - 50),
-      size: 50,
-      color: getRandomColor(),
+      size: isFast ? 35 : 50,
+      color: isFast ? '#3a86ff' : getRandomColor(),
       dir: Math.random() < 0.5 ? 1 : -1,
-      speed: 0.8 + Math.random() * (1.0 + level * 0.1),
-      health: 5 + level * 2
+      speed: isFast ? 2.5 + level * 0.2 : 0.8 + Math.random() * (1.0 + level * 0.1),
+      health: isFast ? 3 + level : 5 + level * 2,
+      fast: isFast
     });
   }
 }
@@ -185,13 +199,21 @@ function checkCollisions() {
   toilets.forEach(t => {
     if (rectsIntersect(player, t)) {
       if (now - lastDamageTime > 500) {
-        player.health -= 15;
+        let damage = 15;
+        if (player.hasShield) damage = Math.floor(damage / 2);
+        player.health -= damage;
         t.health -= 15;
 
         if (t.health <= 0) {
           score += 10 * (player.scoreMultiplier || 1);
           player.coins += 10; // Verdien coins bij kill
           spawnConfetti(t.x + t.size/2, t.y + t.size/2, '#06d6a0');
+          // Power-up drop
+          if (Math.random() < 0.15) { // 15% kans op power-up
+            powerUps.push({
+              x: t.x, y: t.y, size: 25, type: 'heal', color: '#06d6a0', timer: 300
+            });
+          }
           toilets.splice(toilets.indexOf(t), 1);
           createToilets(1);
           if (soundOn) plopSound.play();
@@ -329,11 +351,44 @@ function clearGameMessage() {
   if (deathMessageTimeout) clearTimeout(deathMessageTimeout);
 }
 
+function drawPowerUps() {
+  powerUps.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size/2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function updatePowerUps() {
+  for (let i = powerUps.length - 1; i >= 0; i--) {
+    let p = powerUps[i];
+    p.timer--;
+    if (p.timer <= 0) {
+      powerUps.splice(i, 1);
+      continue;
+    }
+    // Collision met speler
+    if (rectsIntersect(player, {x: p.x, y: p.y, size: p.size})) {
+      if (p.type === 'heal') player.health = Math.min(player.health + 20, player.maxHealth);
+      powerUps.splice(i, 1);
+      if (soundOn) powerUpSound.play();
+    }
+  }
+}
+
 function gameLoop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Dag/nacht cyclus
+  dayTime += 0.005;
+  let r = Math.floor(30 + 40 * Math.sin(dayTime));
+  let g = Math.floor(60 + 60 * Math.sin(dayTime + 1));
+  let b = Math.floor(120 + 80 * Math.sin(dayTime + 2));
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   movePlayer();
   updateToilets();
+  updatePowerUps();
   checkCollisions();
 
   // Health regeneratie (indien actief)
@@ -346,8 +401,26 @@ function gameLoop() {
     }
   }
 
+  // Schild timer
+  if (player.hasShield && player.shieldTimer > 0) {
+    player.shieldTimer--;
+    // Teken schild effect om speler
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = shieldColor;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(player.x + player.size/2, player.y + player.size/2, player.size/1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    if (player.shieldTimer === 0) {
+      player.hasShield = false;
+    }
+  }
+
   drawPlayer();
   drawToilets();
+  drawPowerUps();
   drawConfetti();
 
   if (shake > 0) {
