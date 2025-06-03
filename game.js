@@ -14,6 +14,23 @@ let level = 1;
 let dayTime = true;
 let gameOver = false;
 
+// Extra state voor nieuwe features
+let coins = 0;
+let achievements = [];
+let combo = 0;
+let comboTimer = 0;
+let weather = null; // 'rain', 'snow', 'storm'
+let weatherTimer = 0;
+let portals = [];
+let skins = ['cyan', 'orange', 'lime', 'magenta'];
+let currentSkin = 0;
+let randomEventTimer = 0;
+let randomEventActive = false;
+let shieldActive = false;
+let shieldTimer = 0;
+let slowMotion = false;
+let slowMotionTimer = 0;
+
 // Sounds
 const shootSound = new Audio('sounds/shoot.wav');
 const hitSound = new Audio('sounds/hit.wav');
@@ -24,47 +41,108 @@ bgMusic.volume = 0.3;
 bgMusic.play();
 
 function drawPlayer() {
-  ctx.fillStyle = 'cyan';
+  ctx.save();
+  // Skin
+  ctx.fillStyle = skins[currentSkin];
   ctx.beginPath();
   ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
   ctx.fill();
+  // Shield effect
+  if (shieldActive) {
+    ctx.strokeStyle = 'aqua';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.size + 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
+// Nieuwe power-ups
+function drawPowerUps() {
+  powerUps.forEach(p => {
+    ctx.save();
+    if (p.type === 'green') ctx.fillStyle = 'green';
+    else if (p.type === 'coin') ctx.fillStyle = 'gold';
+    else if (p.type === 'shield') ctx.fillStyle = 'aqua';
+    else if (p.type === 'slow') ctx.fillStyle = 'blue';
+    else if (p.type === 'skin') ctx.fillStyle = 'magenta';
+    else ctx.fillStyle = 'white';
+    ctx.fillRect(p.x, p.y, 15, 15);
+    ctx.restore();
+  });
+}
+
+// Nieuwe vijandtypes
 function drawEnemies() {
   enemies.forEach(enemy => {
-    ctx.fillStyle = 'red';
+    ctx.save();
+    if (enemy.type === 'fast') ctx.fillStyle = 'orange';
+    else if (enemy.type === 'zigzag') ctx.fillStyle = 'yellow';
+    else if (enemy.type === 'splitter') ctx.fillStyle = 'pink';
+    else ctx.fillStyle = 'red';
     ctx.beginPath();
     ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
   });
 }
 
-function drawBullets() {
-  bullets.forEach(bullet => {
-    ctx.fillStyle = 'yellow';
-    ctx.fillRect(bullet.x, bullet.y, 5, 10);
-  });
-}
-
-function drawPowerUps() {
-  powerUps.forEach(p => {
-    ctx.fillStyle = 'green';
-    ctx.fillRect(p.x, p.y, 15, 15);
-  });
-}
-
-function drawBosses() {
-  bosses.forEach(b => {
-    ctx.fillStyle = 'purple';
+// Portals tekenen
+function drawPortals() {
+  portals.forEach(p => {
+    ctx.save();
+    ctx.strokeStyle = 'violet';
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(p.x, p.y, 25, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   });
 }
 
+// Weer-effecten
+function drawWeather() {
+  if (weather === 'rain') {
+    for (let i = 0; i < 50; i++) {
+      ctx.strokeStyle = '#00f8';
+      ctx.beginPath();
+      let rx = Math.random() * canvas.width;
+      let ry = Math.random() * canvas.height;
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(rx, ry + 15);
+      ctx.stroke();
+    }
+  }
+  if (weather === 'snow') {
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = '#fff8';
+      ctx.beginPath();
+      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if (weather === 'storm') {
+    if (Math.random() < 0.01) {
+      ctx.fillStyle = '#fff8';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+}
+
+// HUD uitbreiden
 function drawHUD() {
   ctx.fillStyle = 'white';
-  ctx.fillText(`Score: ${player.score}  Lives: ${player.lives}  Level: ${level}`, 10, 20);
+  ctx.fillText(`Score: ${player.score}  Lives: ${player.lives}  Level: ${level}  Coins: ${coins}`, 10, 20);
+  ctx.fillText(`Combo: ${combo}`, 10, 40);
+  ctx.fillText(`Skin: ${skins[currentSkin]}`, 10, 60);
+  if (slowMotion) ctx.fillText('SLOW MOTION!', 10, 80);
+  if (shieldActive) ctx.fillText('SHIELD!', 10, 100);
+  // Achievements
+  achievements.forEach((a, i) => {
+    ctx.fillStyle = 'gold';
+    ctx.fillText(`Achievement: ${a}`, 10, 120 + i * 20);
+  });
 }
 
 function drawDayNightCycle() {
@@ -73,7 +151,14 @@ function drawDayNightCycle() {
 }
 
 function moveEnemies() {
-  enemies.forEach(e => e.y += 1);
+  enemies.forEach(e => {
+    if (e.type === 'fast') e.y += 2.5;
+    else if (e.type === 'zigzag') {
+      e.y += 1.2;
+      e.x += Math.sin(Date.now() / 100 + e.y) * 2;
+    }
+    else e.y += 1;
+  });
   bosses.forEach(b => b.y += 0.5);
 }
 
@@ -83,7 +168,23 @@ function moveBullets() {
 }
 
 function spawnEnemy() {
-  enemies.push({ x: Math.random() * canvas.width, y: 0, size: 15 });
+  // Random type
+  let r = Math.random();
+  let type = 'normal';
+  if (r < 0.15) type = 'fast';
+  else if (r < 0.25) type = 'zigzag';
+  else if (r < 0.3) type = 'splitter';
+  enemies.push({ x: Math.random() * canvas.width, y: 0, size: 15, type });
+}
+
+// Splitter vijand splitst bij dood
+function killEnemy(e, ei) {
+  if (e.type === 'splitter') {
+    for (let i = 0; i < 2; i++) {
+      enemies.push({ x: e.x + i * 10, y: e.y, size: 10, type: 'fast' });
+    }
+  }
+  enemies.splice(ei, 1);
 }
 
 function spawnBoss() {
@@ -91,7 +192,19 @@ function spawnBoss() {
 }
 
 function spawnPowerUp() {
-  powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height });
+  // Random type
+  let r = Math.random();
+  let type = 'green';
+  if (r < 0.2) type = 'coin';
+  else if (r < 0.35) type = 'shield';
+  else if (r < 0.45) type = 'slow';
+  else if (r < 0.5) type = 'skin';
+  powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type });
+}
+
+// Portals spawnen
+function spawnPortal() {
+  portals.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height });
 }
 
 function checkCollisions() {
@@ -99,8 +212,13 @@ function checkCollisions() {
     enemies.forEach((e, ei) => {
       if (Math.hypot(b.x - e.x, b.y - e.y) < e.size) {
         hitSound.play();
-        enemies.splice(ei, 1);
+        killEnemy(e, ei);
         player.score++;
+        combo++;
+        comboTimer = 120;
+        // Achievement
+        if (player.score === 10 && !achievements.includes('10 kills')) achievements.push('10 kills');
+        if (combo === 5 && !achievements.includes('Combo 5')) achievements.push('Combo 5');
       }
     });
     bosses.forEach((bss, bi) => {
@@ -110,6 +228,7 @@ function checkCollisions() {
           hitSound.play();
           bosses.splice(bi, 1);
           player.score += 10;
+          achievements.push('Boss defeated');
         }
       }
     });
@@ -117,15 +236,42 @@ function checkCollisions() {
   powerUps.forEach((p, pi) => {
     if (Math.hypot(player.x - p.x, player.y - p.y) < 20) {
       powerUpSound.play();
+      if (p.type === 'coin') coins += 5;
+      else if (p.type === 'shield') {
+        shieldActive = true;
+        shieldTimer = 300;
+      }
+      else if (p.type === 'slow') {
+        slowMotion = true;
+        slowMotionTimer = 180;
+      }
+      else if (p.type === 'skin') {
+        currentSkin = (currentSkin + 1) % skins.length;
+      }
+      else player.lives++;
       powerUps.splice(pi, 1);
-      player.lives++;
     }
   });
   enemies.forEach((e, ei) => {
     if (Math.hypot(player.x - e.x, player.y - e.y) < e.size) {
+      if (shieldActive) {
+        shieldActive = false;
+        enemies.splice(ei, 1);
+        return;
+      }
       enemies.splice(ei, 1);
       player.lives--;
+      combo = 0;
       if (player.lives <= 0) gameOver = true;
+    }
+  });
+  // Portals
+  portals.forEach((p, pi) => {
+    if (Math.hypot(player.x - p.x, player.y - p.y) < 25) {
+      // Teleport naar random plek
+      player.x = Math.random() * canvas.width;
+      player.y = Math.random() * canvas.height;
+      portals.splice(pi, 1);
     }
   });
 }
@@ -135,29 +281,80 @@ function nextLevel() {
   if (level % 5 === 0) spawnBoss();
   for (let i = 0; i < level * 2; i++) spawnEnemy();
   if (level % 3 === 0) spawnPowerUp();
+  if (level % 4 === 0) spawnPortal();
+  // Achievement
+  if (level === 10 && !achievements.includes('Level 10')) achievements.push('Level 10');
 }
 
 function update() {
   if (gameOver) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawDayNightCycle();
+  drawWeather();
   drawPlayer();
   drawBullets();
   drawEnemies();
   drawPowerUps();
   drawBosses();
+  drawPortals();
   drawHUD();
   moveBullets();
   moveEnemies();
   checkCollisions();
   if (enemies.length === 0 && bosses.length === 0) nextLevel();
+
+  // Combo timer
+  if (comboTimer > 0) comboTimer--;
+  else combo = 0;
+
+  // Shield timer
+  if (shieldActive) {
+    shieldTimer--;
+    if (shieldTimer <= 0) shieldActive = false;
+  }
+
+  // Slow motion timer
+  if (slowMotion) {
+    slowMotionTimer--;
+    if (slowMotionTimer <= 0) slowMotion = false;
+  }
+
+  // Weather timer
+  if (weatherTimer > 0) weatherTimer--;
+  else {
+    let r = Math.random();
+    if (r < 0.33) weather = 'rain';
+    else if (r < 0.66) weather = 'snow';
+    else weather = 'storm';
+    weatherTimer = 600 + Math.random() * 600;
+  }
+
+  // Random event
+  if (!randomEventActive && Math.random() < 0.001) {
+    randomEventActive = true;
+    let eventType = Math.random();
+    if (eventType < 0.5) {
+      // Meteor shower: spawn veel vijanden
+      for (let i = 0; i < 10; i++) spawnEnemy();
+      achievements.push('Meteor Shower!');
+    } else {
+      // Coin rain
+      for (let i = 0; i < 10; i++) powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type: 'coin' });
+      achievements.push('Coin Rain!');
+    }
+    randomEventTimer = 300;
+  }
+  if (randomEventActive) {
+    randomEventTimer--;
+    if (randomEventTimer <= 0) randomEventActive = false;
+  }
 }
 
 setInterval(() => {
   dayTime = !dayTime;
 }, 5000);
 
-setInterval(update, 1000 / 60);
+setInterval(update, slowMotion ? 1000 / 30 : 1000 / 60);
 
 // Controls
 addEventListener('keydown', e => {
@@ -168,5 +365,9 @@ addEventListener('keydown', e => {
   if (e.key === ' ') {
     bullets.push({ x: player.x, y: player.y });
     shootSound.play();
+  }
+  // Skins wisselen
+  if (e.key === 'Tab') {
+    currentSkin = (currentSkin + 1) % skins.length;
   }
 });
