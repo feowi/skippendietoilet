@@ -30,6 +30,15 @@ let shieldActive = false;
 let shieldTimer = 0;
 let slowMotion = false;
 let slowMotionTimer = 0;
+let xp = 0;
+let xpToNext = 20;
+let playerLevel = 1;
+let paused = false;
+let doubleScore = false;
+let doubleScoreTimer = 0;
+let speedBoost = false;
+let speedBoostTimer = 0;
+let showGameOver = false;
 
 // Sounds
 const shootSound = new Audio('sounds/shoot.wav');
@@ -137,12 +146,15 @@ function drawHUD() {
   ctx.fillText(`Score: ${player.score}  Lives: ${player.lives}  Level: ${level}  Coins: ${coins}`, 10, 20);
   ctx.fillText(`Combo: ${combo}`, 10, 40);
   ctx.fillText(`Skin: ${skins[currentSkin]}`, 10, 60);
-  if (slowMotion) ctx.fillText('SLOW MOTION!', 10, 80);
-  if (shieldActive) ctx.fillText('SHIELD!', 10, 100);
+  ctx.fillText(`XP: ${xp}/${xpToNext}  Player Lv: ${playerLevel}`, 10, 80);
+  if (slowMotion) ctx.fillText('SLOW MOTION!', 10, 100);
+  if (shieldActive) ctx.fillText('SHIELD!', 10, 120);
+  if (doubleScore) ctx.fillText('DOUBLE SCORE!', 10, 140);
+  if (speedBoost) ctx.fillText('SPEED BOOST!', 10, 160);
   // Achievements
   achievements.forEach((a, i) => {
     ctx.fillStyle = 'gold';
-    ctx.fillText(`Achievement: ${a}`, 10, 120 + i * 20);
+    ctx.fillText(`Achievement: ${a}`, 10, 180 + i * 20);
   });
 }
 
@@ -196,10 +208,12 @@ function spawnPowerUp() {
   // Random type
   let r = Math.random();
   let type = 'green';
-  if (r < 0.2) type = 'coin';
-  else if (r < 0.35) type = 'shield';
-  else if (r < 0.45) type = 'slow';
-  else if (r < 0.5) type = 'skin';
+  if (r < 0.15) type = 'coin';
+  else if (r < 0.25) type = 'shield';
+  else if (r < 0.35) type = 'slow';
+  else if (r < 0.45) type = 'skin';
+  else if (r < 0.55) type = 'doubleScore';
+  else if (r < 0.65) type = 'speedBoost';
   powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type });
 }
 
@@ -214,11 +228,13 @@ function checkCollisions() {
       if (Math.hypot(b.x - e.x, b.y - e.y) < e.size) {
         hitSound.play();
         killEnemy(e, ei);
-        player.score++;
+        let scoreAdd = doubleScore ? 2 : 1;
+        player.score += scoreAdd;
+        xp += 3;
         combo++;
         comboTimer = 120;
         // Achievement
-        if (player.score === 10 && !achievements.includes('10 kills')) achievements.push('10 kills');
+        if (player.score >= 10 && !achievements.includes('10 kills')) achievements.push('10 kills');
         if (combo === 5 && !achievements.includes('Combo 5')) achievements.push('Combo 5');
       }
     });
@@ -228,7 +244,9 @@ function checkCollisions() {
         if (bss.health <= 0) {
           hitSound.play();
           bosses.splice(bi, 1);
-          player.score += 10;
+          let scoreAdd = doubleScore ? 20 : 10;
+          player.score += scoreAdd;
+          xp += 10;
           achievements.push('Boss defeated');
         }
       }
@@ -249,6 +267,14 @@ function checkCollisions() {
       else if (p.type === 'skin') {
         currentSkin = (currentSkin + 1) % skins.length;
       }
+      else if (p.type === 'doubleScore') {
+        doubleScore = true;
+        doubleScoreTimer = 300;
+      }
+      else if (p.type === 'speedBoost') {
+        speedBoost = true;
+        speedBoostTimer = 300;
+      }
       else player.lives++;
       powerUps.splice(pi, 1);
     }
@@ -263,13 +289,15 @@ function checkCollisions() {
       enemies.splice(ei, 1);
       player.lives--;
       combo = 0;
-      if (player.lives <= 0) gameOver = true;
+      if (player.lives <= 0) {
+        gameOver = true;
+        showGameOver = true;
+      }
     }
   });
   // Portals
   portals.forEach((p, pi) => {
     if (Math.hypot(player.x - p.x, player.y - p.y) < 25) {
-      // Teleport naar random plek
       player.x = Math.random() * canvas.width;
       player.y = Math.random() * canvas.height;
       portals.splice(pi, 1);
@@ -288,7 +316,24 @@ function nextLevel() {
 }
 
 function update() {
-  if (gameOver) return;
+  if (paused) {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 48px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
+    ctx.textAlign = "left";
+    ctx.restore();
+    return;
+  }
+  if (gameOver) {
+    if (showGameOver) drawGameOver();
+    return;
+  }
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawDayNightCycle();
   drawWeather();
@@ -312,6 +357,18 @@ function update() {
   if (shieldActive) {
     shieldTimer--;
     if (shieldTimer <= 0) shieldActive = false;
+  }
+
+  // Double score timer
+  if (doubleScore) {
+    doubleScoreTimer--;
+    if (doubleScoreTimer <= 0) doubleScore = false;
+  }
+
+  // Speed boost timer
+  if (speedBoost) {
+    speedBoostTimer--;
+    if (speedBoostTimer <= 0) speedBoost = false;
   }
 
   // Slow motion timer
@@ -350,10 +407,39 @@ function update() {
     if (randomEventTimer <= 0) randomEventActive = false;
   }
 
+  // XP/level up
+  if (xp >= xpToNext) {
+    xp -= xpToNext;
+    playerLevel++;
+    xpToNext = Math.floor(xpToNext * 1.3 + 10);
+    player.lives++;
+    achievements.push('Level up!');
+  }
+
   // UI bijwerken
   if (typeof updateUI === 'function') {
-    updateUI(player.score, level, coins, player.lives);
+    updateUI(player.score, level, coins, player.lives, xp, xpToNext, playerLevel);
   }
+}
+
+function drawGameOver() {
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#222";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 48px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 40);
+  ctx.font = "28px sans-serif";
+  ctx.fillText(`Score: ${player.score}`, canvas.width / 2, canvas.height / 2 + 10);
+  ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 60);
+  ctx.textAlign = "left";
+  ctx.font = "16px sans-serif";
+  ctx.fillStyle = "#0ff";
+  ctx.fillText("Tip: Gebruik de shop en power-ups!", 20, canvas.height - 30);
+  ctx.restore();
 }
 
 setInterval(() => {
@@ -364,16 +450,78 @@ setInterval(update, slowMotion ? 1000 / 30 : 1000 / 60);
 
 // Controls
 addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft') player.x -= player.speed;
-  if (e.key === 'ArrowRight') player.x += player.speed;
-  if (e.key === 'ArrowUp') player.y -= player.speed;
-  if (e.key === 'ArrowDown') player.y += player.speed;
+  if (paused && e.key !== 'p' && e.key !== 'P' && e.key !== 'r' && e.key !== 'R') return;
+  if (e.key === 'ArrowLeft') player.x -= speedBoost ? player.speed * 2 : player.speed;
+  if (e.key === 'ArrowRight') player.x += speedBoost ? player.speed * 2 : player.speed;
+  if (e.key === 'ArrowUp') player.y -= speedBoost ? player.speed * 2 : player.speed;
+  if (e.key === 'ArrowDown') player.y += speedBoost ? player.speed * 2 : player.speed;
   if (e.key === ' ') {
     bullets.push({ x: player.x, y: player.y });
     shootSound.play();
   }
-  // Skins wisselen
   if (e.key === 'Tab') {
     currentSkin = (currentSkin + 1) % skins.length;
   }
+  if (e.key === 'p' || e.key === 'P') {
+    paused = !paused;
+  }
+  if ((e.key === 'r' || e.key === 'R') && gameOver) {
+    // Reset alles
+    player = { x: 400, y: 300, size: 20, speed: 5, score: 0, lives: 3 };
+    bullets = [];
+    enemies = [];
+    powerUps = [];
+    bosses = [];
+    level = 1;
+    dayTime = true;
+    gameOver = false;
+    showGameOver = false;
+    coins = 0;
+    achievements = [];
+    combo = 0;
+    comboTimer = 0;
+    weather = null;
+    weatherTimer = 0;
+    portals = [];
+    currentSkin = 0;
+    randomEventTimer = 0;
+    randomEventActive = false;
+    shieldActive = false;
+    shieldTimer = 0;
+    slowMotion = false;
+    slowMotionTimer = 0;
+    xp = 0;
+    xpToNext = 20;
+    playerLevel = 1;
+    doubleScore = false;
+    doubleScoreTimer = 0;
+    speedBoost = false;
+    speedBoostTimer = 0;
+    paused = false;
+  }
 });
+
+// Shop functionaliteit
+if (typeof document !== "undefined") {
+  document.getElementById('shop-items').onclick = function(e) {
+    let li = e.target.tagName === 'LI' ? e.target : e.target.closest('li');
+    if (!li) return;
+    let text = li.textContent;
+    if (text.includes('Extra Life') && coins >= 10) {
+      player.lives++;
+      coins -= 10;
+    }
+    if (text.includes('Shield') && coins >= 8) {
+      shieldActive = true;
+      shieldTimer = 300;
+      coins -= 8;
+    }
+    if (text.includes('Random Skin') && coins >= 5) {
+      currentSkin = Math.floor(Math.random() * skins.length);
+      coins -= 5;
+    }
+    if (typeof updateUI === 'function') {
+      updateUI(player.score, level, coins, player.lives, xp, xpToNext, playerLevel);
+    }
+  };
+}

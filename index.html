@@ -10,6 +10,14 @@
     <div id="score">Score: 0</div>
     <div id="level">Level: 1</div>
     <div id="coins">Coins: 0</div>
+    <div id="xpbar-container">
+      <span>XP:</span>
+      <div id="xp-bar">
+        <div id="xp-fill" style="width:0%"></div>
+      </div>
+      <span id="xp-text">0/20</span>
+      <span id="player-level" style="margin-left:10px;">Lv: 1</span>
+    </div>
     <div id="health-container">
       <span>Health:</span>
       <div id="health-bar">
@@ -19,6 +27,7 @@
     </div>
     <button id="shop-btn">Shop</button>
     <button id="settings-btn">Settings</button>
+    <button id="pause-btn">Pause</button>
   </div>
   <canvas id="gameCanvas" width="800" height="600"></canvas>
 
@@ -46,13 +55,17 @@
   <div id="shopMessage"></div>
   <script src="game.js"></script>
   <script>
-    // UI updates vanuit game.js
-    function updateUI(score, level, coins, lives) {
+    function updateUI(score, level, coins, lives, xp, xpToNext, playerLevel) {
       document.getElementById('score').textContent = 'Score: ' + score;
       document.getElementById('level').textContent = 'Level: ' + level;
       document.getElementById('coins').textContent = 'Coins: ' + coins;
       document.getElementById('health-text').textContent = lives;
       document.getElementById('health-fill').style.width = (lives * 33.33) + '%';
+      if (typeof xp !== 'undefined') {
+        document.getElementById('xp-text').textContent = xp + '/' + xpToNext;
+        document.getElementById('xp-fill').style.width = Math.min(100, (xp / xpToNext) * 100) + '%';
+        document.getElementById('player-level').textContent = 'Lv: ' + playerLevel;
+      }
     }
 
     // Shop/modal logica
@@ -80,6 +93,10 @@
         document.getElementById('shopMessage').style.display = 'block';
         setTimeout(() => document.getElementById('shopMessage').style.display = 'none', 1200);
       }
+    };
+
+    document.getElementById('pause-btn').onclick = function() {
+      if (window.dispatchEvent) window.dispatchEvent(new KeyboardEvent('keydown', {key:'p'}));
     };
   </script>
 </body>
