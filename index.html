@@ -25,6 +25,13 @@
       </div>
       <span id="health-text">3</span>
     </div>
+    <div id="weapon-info" style="margin-top:10px;">
+      Weapon: <span id="weapon-name">Gun</span>
+      <span id="weapon-unlocks" style="font-size:16px;display:block;"></span>
+    </div>
+    <div id="achievements-info" style="font-size:16px;margin-top:10px;">
+      Achievements unlocken wapens, trails en pets!
+    </div>
     <button id="shop-btn">Shop</button>
     <button id="settings-btn">Settings</button>
     <button id="pause-btn">Pause</button>
@@ -65,6 +72,14 @@
         document.getElementById('xp-text').textContent = xp + '/' + xpToNext;
         document.getElementById('xp-fill').style.width = Math.min(100, (xp / xpToNext) * 100) + '%';
         document.getElementById('player-level').textContent = 'Lv: ' + playerLevel;
+      }
+      // Weapon info
+      if (window.weapons) {
+        document.getElementById('weapon-name').textContent = weapons[currentWeapon].name;
+        let unlocks = [];
+        if (weapons[1] && weapons[1].unlocked) unlocks.push("Sword");
+        if (weapons[2] && weapons[2].unlocked) unlocks.push("Laser");
+        document.getElementById('weapon-unlocks').textContent = unlocks.length ? "Unlocked: " + unlocks.join(", ") : "";
       }
     }
 

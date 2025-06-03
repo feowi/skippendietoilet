@@ -25,9 +25,11 @@ body {
   z-index: 20;
   user-select: none;
   background: rgba(0, 0, 0, 0.6);
-  padding: 15px 20px;
-  border-radius: 15px;
-  box-shadow: 0 0 20px #06d6a0cc;
+  padding: 30px 32px;
+  border-radius: 22px;
+  box-shadow: 0 0 40px #06d6a0cc;
+  font-size: 24px;
+  min-width: 340px;
 }
 
 /* Algemene tekst styling voor UI */

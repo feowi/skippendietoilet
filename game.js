@@ -50,160 +50,267 @@ bgMusic.loop = true;
 bgMusic.volume = 0.3;
 bgMusic.play();
 
+// --- Nieuwe variabelen voor weapons, unlocks, pets, trails, etc ---
+let weapons = [
+  { name: "Gun", unlocked: true, fire: shootBullet },
+  { name: "Sword", unlocked: false, fire: swingSword },
+  { name: "Laser", unlocked: false, fire: shootLaser }
+];
+let currentWeapon = 0;
+let swordSwings = [];
+let lasers = [];
+let unlockedSkins = [0];
+let unlockedPets = [];
+let pets = [
+  { name: "Cat", unlocked: false, color: "orange" },
+  { name: "Dog", unlocked: false, color: "brown" }
+];
+let equippedPet = null;
+let trails = [
+  { name: "Rainbow", unlocked: false },
+  { name: "Fire", unlocked: false }
+];
+let equippedTrail = null;
+
+// --- Camera/wereld offset zodat speler altijd in het midden ---
+function getCameraOffset() {
+  return {
+    x: player.x - canvas.width / 2,
+    y: player.y - canvas.height / 2
+  };
+}
+
+// --- Draw player in center, rest met offset ---
 function drawPlayer() {
   ctx.save();
+  let px = canvas.width / 2, py = canvas.height / 2;
+  // Trail
+  if (equippedTrail === "Rainbow") {
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.arc(px, py, player.size + 10 + i * 3, 0, Math.PI * 2);
+      ctx.strokeStyle = `hsl(${i * 60},100%,60%)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
   // Skin
   ctx.fillStyle = skins[currentSkin];
   ctx.beginPath();
-  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+  ctx.arc(px, py, player.size, 0, Math.PI * 2);
   ctx.fill();
+  // Pet
+  if (equippedPet !== null) {
+    ctx.fillStyle = pets[equippedPet].color;
+    ctx.beginPath();
+    ctx.arc(px - 30, py + 30, 12, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // Shield effect
   if (shieldActive) {
     ctx.strokeStyle = 'aqua';
     ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(player.x, player.y, player.size + 6, 0, Math.PI * 2);
+    ctx.arc(px, py, player.size + 6, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();
 }
 
-// Nieuwe power-ups
+// --- Draw enemies met offset ---
+function drawEnemies() {
+  let cam = getCameraOffset();
+  enemies.forEach(enemy => {
+    ctx.save();
+    let ex = enemy.x - cam.x, ey = enemy.y - cam.y;
+    if (enemy.type === 'fast') ctx.fillStyle = 'orange';
+    else if (enemy.type === 'zigzag') ctx.fillStyle = 'yellow';
+    else if (enemy.type === 'tank') ctx.fillStyle = 'gray';
+    else if (enemy.type === 'shooter') ctx.fillStyle = 'blue';
+    else if (enemy.type === 'splitter') ctx.fillStyle = 'pink';
+    else ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(ex, ey, enemy.size, 0, Math.PI * 2);
+    ctx.fill();
+    // Enemy health bar
+    if (enemy.health && enemy.health < enemy.maxHealth) {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(ex - 15, ey - enemy.size - 10, 30, 5);
+      ctx.fillStyle = "#f00";
+      ctx.fillRect(ex - 15, ey - enemy.size - 10, 30 * (enemy.health / enemy.maxHealth), 5);
+    }
+    ctx.restore();
+  });
+}
+
+// --- Draw bullets, lasers, sword swings met offset ---
+function drawBullets() {
+  let cam = getCameraOffset();
+  bullets.forEach(bullet => {
+    ctx.fillStyle = 'yellow';
+    ctx.fillRect(bullet.x - cam.x, bullet.y - cam.y, 5, 10);
+  });
+  lasers.forEach(l => {
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(l.x1 - cam.x, l.y1 - cam.y);
+    ctx.lineTo(l.x2 - cam.x, l.y2 - cam.y);
+    ctx.stroke();
+  });
+  swordSwings.forEach(s => {
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, player.size + 18, s.a1, s.a2);
+    ctx.stroke();
+  });
+}
+
+// --- Draw powerups, portals met offset ---
 function drawPowerUps() {
+  let cam = getCameraOffset();
   powerUps.forEach(p => {
     ctx.save();
+    let px = p.x - cam.x, py = p.y - cam.y;
     if (p.type === 'green') ctx.fillStyle = 'green';
     else if (p.type === 'coin') ctx.fillStyle = 'gold';
     else if (p.type === 'shield') ctx.fillStyle = 'aqua';
     else if (p.type === 'slow') ctx.fillStyle = 'blue';
     else if (p.type === 'skin') ctx.fillStyle = 'magenta';
+    else if (p.type === 'mystery') ctx.fillStyle = 'purple';
     else ctx.fillStyle = 'white';
-    ctx.fillRect(p.x, p.y, 15, 15);
+    ctx.fillRect(px, py, 15, 15);
     ctx.restore();
   });
 }
-
-// Nieuwe vijandtypes
-function drawEnemies() {
-  enemies.forEach(enemy => {
-    ctx.save();
-    if (enemy.type === 'fast') ctx.fillStyle = 'orange';
-    else if (enemy.type === 'zigzag') ctx.fillStyle = 'yellow';
-    else if (enemy.type === 'splitter') ctx.fillStyle = 'pink';
-    else ctx.fillStyle = 'red';
-    ctx.beginPath();
-    ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  });
-}
-
-// Portals tekenen
 function drawPortals() {
+  let cam = getCameraOffset();
   portals.forEach(p => {
     ctx.save();
     ctx.strokeStyle = 'violet';
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 25, 0, Math.PI * 2);
+    ctx.arc(p.x - cam.x, p.y - cam.y, 25, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   });
 }
 
-// Weer-effecten
-function drawWeather() {
-  if (weather === 'rain') {
-    for (let i = 0; i < 50; i++) {
-      ctx.strokeStyle = '#00f8';
-      ctx.beginPath();
-      let rx = Math.random() * canvas.width;
-      let ry = Math.random() * canvas.height;
-      ctx.moveTo(rx, ry);
-      ctx.lineTo(rx, ry + 15);
-      ctx.stroke();
-    }
-  }
-  if (weather === 'snow') {
-    for (let i = 0; i < 40; i++) {
-      ctx.fillStyle = '#fff8';
-      ctx.beginPath();
-      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  if (weather === 'storm') {
-    if (Math.random() < 0.01) {
-      ctx.fillStyle = '#fff8';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-  }
-}
-
-// HUD uitbreiden
-function drawHUD() {
-  ctx.fillStyle = 'white';
-  ctx.fillText(`Score: ${player.score}  Lives: ${player.lives}  Level: ${level}  Coins: ${coins}`, 10, 20);
-  ctx.fillText(`Combo: ${combo}`, 10, 40);
-  ctx.fillText(`Skin: ${skins[currentSkin]}`, 10, 60);
-  ctx.fillText(`XP: ${xp}/${xpToNext}  Player Lv: ${playerLevel}`, 10, 80);
-  if (slowMotion) ctx.fillText('SLOW MOTION!', 10, 100);
-  if (shieldActive) ctx.fillText('SHIELD!', 10, 120);
-  if (doubleScore) ctx.fillText('DOUBLE SCORE!', 10, 140);
-  if (speedBoost) ctx.fillText('SPEED BOOST!', 10, 160);
-  // Achievements
-  achievements.forEach((a, i) => {
-    ctx.fillStyle = 'gold';
-    ctx.fillText(`Achievement: ${a}`, 10, 180 + i * 20);
-  });
-}
-
-function drawDayNightCycle() {
-  ctx.fillStyle = dayTime ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,50,0.5)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-
+// --- Enemy AI en movement ---
 function moveEnemies() {
+  let cam = getCameraOffset();
   enemies.forEach(e => {
-    if (e.type === 'fast') e.y += 2.5;
-    else if (e.type === 'zigzag') {
-      e.y += 1.2;
+    // Richting naar speler (altijd midden)
+    let dx = canvas.width / 2 - (e.x - cam.x);
+    let dy = canvas.height / 2 - (e.y - cam.y);
+    let dist = Math.hypot(dx, dy);
+    let speed = e.type === 'fast' ? 2.5 : e.type === 'tank' ? 0.7 : 1;
+    if (e.type === 'zigzag') {
       e.x += Math.sin(Date.now() / 100 + e.y) * 2;
+      e.y += speed;
+    } else if (e.type === 'shooter') {
+      e.y += 0.7;
+      // Schiet af en toe
+      if (Math.random() < 0.01) {
+        let angle = Math.atan2(dy, dx);
+        enemies.push({
+          x: e.x, y: e.y, size: 7, type: 'bullet', vx: Math.cos(angle) * 5, vy: Math.sin(angle) * 5
+        });
+      }
+    } else if (e.type === 'bullet') {
+      e.x += e.vx; e.y += e.vy;
+    } else {
+      e.x += dx / dist * speed;
+      e.y += dy / dist * speed;
     }
-    else e.y += 1;
   });
   bosses.forEach(b => b.y += 0.5);
 }
 
-function moveBullets() {
-  bullets = bullets.filter(b => b.y > 0);
-  bullets.forEach(b => b.y -= 10);
+// --- Weapons ---
+function shootBullet() {
+  bullets.push({ x: player.x, y: player.y, vx: 0, vy: -10 });
+}
+function swingSword() {
+  swordSwings.push({ a1: Math.PI * 1.2, a2: Math.PI * 1.8, timer: 15 });
+}
+function shootLaser() {
+  lasers.push({
+    x1: player.x, y1: player.y,
+    x2: player.x, y2: player.y - 300,
+    timer: 10
+  });
 }
 
-function spawnEnemy() {
-  // Random type
-  let r = Math.random();
-  let type = 'normal';
-  if (r < 0.15) type = 'fast';
-  else if (r < 0.25) type = 'zigzag';
-  else if (r < 0.3) type = 'splitter';
-  enemies.push({ x: Math.random() * canvas.width, y: 0, size: 15, type });
-}
+// --- Weapon switching ---
+addEventListener('keydown', e => {
+  // ...existing code...
+  if (e.key === '1') currentWeapon = 0;
+  if (e.key === '2' && weapons[1].unlocked) currentWeapon = 1;
+  if (e.key === '3' && weapons[2].unlocked) currentWeapon = 2;
+  // ...existing code...
+});
 
-// Splitter vijand splitst bij dood
-function killEnemy(e, ei) {
-  if (e.type === 'splitter') {
-    for (let i = 0; i < 2; i++) {
-      enemies.push({ x: e.x + i * 10, y: e.y, size: 10, type: 'fast' });
-    }
+// --- Fire weapon ---
+addEventListener('keydown', e => {
+  // ...existing code...
+  if (e.key === ' ' && !paused && !gameOver) {
+    weapons[currentWeapon].fire();
+    shootSound.play();
   }
-  enemies.splice(ei, 1);
+  // ...existing code...
+});
+
+// --- Update sword/laser timers ---
+function updateWeapons() {
+  swordSwings = swordSwings.filter(s => --s.timer > 0);
+  lasers = lasers.filter(l => --l.timer > 0);
 }
 
-function spawnBoss() {
-  bosses.push({ x: canvas.width / 2, y: 0, size: 50, health: 10 });
+// --- Unlocks via achievements ---
+function unlockByAchievement(name) {
+  if (name === "Sword Master") weapons[1].unlocked = true;
+  if (name === "Laser Unlocked") weapons[2].unlocked = true;
+  if (name === "Rainbow Trail") {
+    trails[0].unlocked = true;
+    equippedTrail = "Rainbow";
+  }
+  if (name === "Cat Friend") {
+    pets[0].unlocked = true;
+    equippedPet = 0;
+  }
+  if (name === "Fire Trail") {
+    trails[1].unlocked = true;
+    equippedTrail = "Fire";
+  }
 }
 
+// --- Achievements uitbreiden ---
+function checkAchievements() {
+  if (player.score >= 25 && !achievements.includes("Sword Master")) {
+    achievements.push("Sword Master");
+    unlockByAchievement("Sword Master");
+  }
+  if (player.score >= 50 && !achievements.includes("Laser Unlocked")) {
+    achievements.push("Laser Unlocked");
+    unlockByAchievement("Laser Unlocked");
+  }
+  if (combo >= 10 && !achievements.includes("Rainbow Trail")) {
+    achievements.push("Rainbow Trail");
+    unlockByAchievement("Rainbow Trail");
+  }
+  if (playerLevel >= 5 && !achievements.includes("Cat Friend")) {
+    achievements.push("Cat Friend");
+    unlockByAchievement("Cat Friend");
+  }
+  if (player.score >= 100 && !achievements.includes("Fire Trail")) {
+    achievements.push("Fire Trail");
+    unlockByAchievement("Fire Trail");
+  }
+}
+
+// --- Fun: mystery box, minigame, random events, pets, trails ---
 function spawnPowerUp() {
   // Random type
   let r = Math.random();
@@ -215,13 +322,20 @@ function spawnPowerUp() {
   else if (r < 0.55) type = 'doubleScore';
   else if (r < 0.65) type = 'speedBoost';
   powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type });
+  if (Math.random() < 0.1) powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type: 'mystery' });
 }
 
-// Portals spawnen
-function spawnPortal() {
-  portals.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height });
+// --- Mystery box effect ---
+function openMysteryBox() {
+  let r = Math.random();
+  if (r < 0.2) player.lives++;
+  else if (r < 0.4) coins += 10;
+  else if (r < 0.6) shieldActive = true;
+  else if (r < 0.8) doubleScore = true;
+  else achievements.push("Lucky Box!");
 }
 
+// --- Check collisions aangepast voor weapons, mystery, unlocks ---
 function checkCollisions() {
   bullets.forEach(b => {
     enemies.forEach((e, ei) => {
@@ -303,18 +417,129 @@ function checkCollisions() {
       portals.splice(pi, 1);
     }
   });
+  // Sword swings
+  swordSwings.forEach(s => {
+    enemies.forEach((e, ei) => {
+      let cam = getCameraOffset();
+      let ex = e.x - cam.x, ey = e.y - cam.y;
+      let dx = ex - canvas.width / 2, dy = ey - canvas.height / 2;
+      let dist = Math.hypot(dx, dy);
+      let angle = Math.atan2(dy, dx);
+      if (dist < player.size + 25 && angle > s.a1 && angle < s.a2) {
+        killEnemy(e, ei);
+        player.score++;
+        xp += 2;
+      }
+    });
+  });
+  // Lasers
+  lasers.forEach(l => {
+    enemies.forEach((e, ei) => {
+      let cam = getCameraOffset();
+      let ex = e.x - cam.x, ey = e.y - cam.y;
+      if (Math.abs(ex - canvas.width / 2) < 10 && ey < canvas.height / 2 && ey > canvas.height / 2 - 300) {
+        killEnemy(e, ei);
+        player.score += 2;
+        xp += 3;
+      }
+    });
+  });
+  // Powerups
+  powerUps.forEach((p, pi) => {
+    let cam = getCameraOffset();
+    let px = p.x - cam.x, py = p.y - cam.y;
+    if (Math.hypot(canvas.width / 2 - px, canvas.height / 2 - py) < player.size + 10) {
+      if (p.type === 'mystery') openMysteryBox();
+      else if (p.type === 'coin') coins += 5;
+      else if (p.type === 'shield') {
+        shieldActive = true;
+        shieldTimer = 300;
+      }
+      else if (p.type === 'slow') {
+        slowMotion = true;
+        slowMotionTimer = 180;
+      }
+      else if (p.type === 'skin') {
+        currentSkin = (currentSkin + 1) % skins.length;
+      }
+      else if (p.type === 'doubleScore') {
+        doubleScore = true;
+        doubleScoreTimer = 300;
+      }
+      else if (p.type === 'speedBoost') {
+        speedBoost = true;
+        speedBoostTimer = 300;
+      }
+      else player.lives++;
+      powerUps.splice(pi, 1);
+    }
+  });
+  enemies.forEach((e, ei) => {
+    if (Math.hypot(player.x - e.x, player.y - e.y) < e.size) {
+      if (shieldActive) {
+        shieldActive = false;
+        enemies.splice(ei, 1);
+        return;
+      }
+      enemies.splice(ei, 1);
+      player.lives--;
+      combo = 0;
+      if (player.lives <= 0) {
+        gameOver = true;
+        showGameOver = true;
+      }
+    }
+  });
+  // Portals
+  portals.forEach((p, pi) => {
+    if (Math.hypot(player.x - p.x, player.y - p.y) < 25) {
+      player.x = Math.random() * canvas.width;
+      player.y = Math.random() * canvas.height;
+      portals.splice(pi, 1);
+    }
+  });
+  // Sword swings
+  swordSwings.forEach(s => {
+    enemies.forEach((e, ei) => {
+      let cam = getCameraOffset();
+      let ex = e.x - cam.x, ey = e.y - cam.y;
+      let dx = ex - canvas.width / 2, dy = ey - canvas.height / 2;
+      let dist = Math.hypot(dx, dy);
+      let angle = Math.atan2(dy, dx);
+      if (dist < player.size + 25 && angle > s.a1 && angle < s.a2) {
+        killEnemy(e, ei);
+        player.score++;
+        xp += 2;
+      }
+    });
+  });
+  // Lasers
+  lasers.forEach(l => {
+    enemies.forEach((e, ei) => {
+      let cam = getCameraOffset();
+      let ex = e.x - cam.x, ey = e.y - cam.y;
+      if (Math.abs(ex - canvas.width / 2) < 10 && ey < canvas.height / 2 && ey > canvas.height / 2 - 300) {
+        killEnemy(e, ei);
+        player.score += 2;
+        xp += 3;
+      }
+    });
+  });
+  // Powerups
+  powerUps.forEach((p, pi) => {
+    let cam = getCameraOffset();
+    let px = p.x - cam.x, py = p.y - cam.y;
+    if (Math.hypot(canvas.width / 2 - px, canvas.height / 2 - py) < player.size + 10) {
+      if (p.type === 'mystery') openMysteryBox();
+      // ...existing code...
+      powerUps.splice(pi, 1);
+    }
+  });
+  // ...existing code...
+  checkAchievements();
 }
 
-function nextLevel() {
-  level++;
-  if (level % 5 === 0) spawnBoss();
-  for (let i = 0; i < level * 2; i++) spawnEnemy();
-  if (level % 3 === 0) spawnPowerUp();
-  if (level % 4 === 0) spawnPortal();
-  // Achievement
-  if (level === 10 && !achievements.includes('Level 10')) achievements.push('Level 10');
-}
-
+// --- update() aanvullen ---
 function update() {
   if (paused) {
     ctx.save();
