@@ -1,220 +1,77 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Toiletten Spel Deluxe</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Volledige Game</title>
   <style>
-    /* Styling voor popups, shopUI en notificaties */
-    #death-popup, #top-notification, #shopUI, #shopMessage {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      user-select: none;
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #87CEEB; /* dagkleur */
     }
-
-    #death-popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.8);
+    body {
+      background: black;
       color: white;
-      padding: 30px 40px;
-      border-radius: 20px;
-      box-shadow: 0 0 20px #ff4444;
-      display: none;
-      z-index: 9999;
       text-align: center;
-    }
-
-    #death-ok-btn {
-      background: #ff4444;
-      border: none;
-      padding: 12px 30px;
-      border-radius: 12px;
-      color: white;
-      font-weight: 700;
-      font-size: 18px;
-      cursor: pointer;
-      box-shadow: 0 0 10px #ff5555;
-      transition: background 0.3s ease;
-    }
-
-    #death-ok-btn:hover {
-      background: #ff6666;
-    }
-
-    #top-notification {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #222;
-      color: #0f0;
-      padding: 12px 30px;
-      border-radius: 15px;
-      box-shadow: 0 0 10px #0f0;
-      font-weight: 700;
-      font-size: 18px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.5s ease;
-      z-index: 9999;
-    }
-
-    #shopUI {
-      display: none;
-      position: fixed;
-      top: 50px;
-      right: 20px;
-      background: #222;
-      color: #fff;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #000;
-    }
-
-    #shopMessage {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #0f0;
-      color: #000;
-      padding: 10px 20px;
-      border-radius: 8px;
-      display: none;
+      font-family: sans-serif;
     }
   </style>
 </head>
 <body>
-  <div id="ui">
-    <div id="score">Score: 0</div>
-    <div id="level">Level: 1</div>
-    <div id="upgrades">Upgrades: Geen</div>
-    <div id="health-container">
-      <label>Health:</label>
-      <div id="health-bar">
-        <div id="health-fill"></div>
-      </div>
-      <span id="health-text">100</span>
-    </div>
-    <div id="highscore">Highscore: 0</div>
-    <button id="shop-btn">🛒 Winkel openen</button>
-    <button id="settings-btn">⚙️ Instellingen</button>
-  </div>
-
+  <h1>Volledige Game</h1>
   <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-  <!-- Winkel pop-up -->
-  <div id="shop" class="modal hidden">
-    <h2>Winkel</h2>
-    <ul id="shop-items">
-      <!-- dynamisch gevuld -->
-    </ul>
-    <button id="close-shop">Sluiten</button>
-  </div>
+    let keys = {};
+    let mouseX = 0;
+    let mouseY = 0;
 
-  <!-- Instellingen pop-up -->
-  <div id="settings" class="modal hidden">
-    <h2>Instellingen</h2>
-    <label>
-      <input type="checkbox" id="toggle-sound" checked /> Geluid aan/uit
-    </label>
-    <br />
-    <button id="close-settings">Sluiten</button>
-  </div>
+    document.addEventListener("keydown", (e) => keys[e.key] = true);
+    document.addEventListener("keyup", (e) => keys[e.key] = false);
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    });
+    canvas.addEventListener("click", () => activatePowerUp());
 
-  <!-- Audios -->
-  <audio id="plopSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
-  <audio id="powerUpSound" src="https://www.soundjay.com/button/beep-09.wav"></audio>
-  <audio id="bossSound" src="https://www.soundjay.com/button/beep-04.wav"></audio>
+    const player = {
+      x: 400,
+      y: 300,
+      size: 20,
+      color: "lime",
+      speed: 3,
+      baseSpeed: 3,
+      lives: 3,
+      score: 0,
+      invisible: false,
+      invisibleTimer: 0
+    };
 
-  <!-- Death popup -->
-  <div id="death-popup">
-    <p style="font-size: 24px; margin-bottom: 20px;">Je bent dood gegaan!</p>
-    <button id="death-ok-btn">OK</button>
-  </div>
+    const enemies = [];
+    const powerUps = [];
 
-  <!-- Top notificatie -->
-  <div id="top-notification"></div>
+    const gameSettings = {
+      isNight: false,
+      dayNightTimer: 0,
+      dayNightInterval: 1000 * 10, // 10 sec
+    };
 
-  <!-- Winkel UI -->
-  <div id="shopUI">
-    <h3>🛒 Winkel</h3>
-    <div>
-      <button id="buyWeaponBtn">Wapen upgrade (<span id="weaponPrice">20</span> punten)</button>
-      <span>Aantal: <span id="shopWeaponsCount">0</span></span>
-    </div>
-    <div>
-      <button id="buyArmorBtn">Armor upgrade (<span id="armorPrice">15</span> punten)</button>
-      <span>Aantal: <span id="shopArmorCount">0</span></span>
-    </div>
-    <div>
-      <button id="buySpeedBoostBtn" disabled>Speed boost (<span id="speedBoostPrice">30</span> punten)</button>
-      <span id="speedBoostCooldown">Cooldown: 0</span>
-    </div>
-    <button id="closeShopBtn">Sluiten</button>
-  </div>
+    function spawnEnemy() {
+      enemies.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: 20,
+        speed: 1.5 + Math.random(),
+        color: gameSettings.isNight ? "purple" : "red",
+        isBoss: gameSettings.isNight && Math.random() < 0.1
+      });
+    }
 
-  <!-- Winkel notificatie -->
-  <div id="shopMessage"></div>
-
-<!-- Coins display -->
-<div id="coins" style="position: absolute; top: 50px; left: 10px; color: white; font-family: Arial, sans-serif; font-size: 18px;"></div>
-
-<!-- Game message -->
-<div id="game-message" style="
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,0.7);
-  color: white;
-  padding: 8px 15px;
-  border-radius: 5px;
-  font-family: Arial, sans-serif;
-  font-size: 18px;
-  display: none;
-  z-index: 1000;
-"></div>
-
-<!-- Shop modal styling -->
-<div id="shop" class="modal hidden" style="
-  position: fixed;
-  top: 60px;
-  right: 20px;
-  width: 280px;
-  height: 400px;
-  background: rgba(0,0,0,0.85);
-  color: white;
-  overflow-y: auto;
-  padding: 15px;
-  border-radius: 10px;
-  z-index: 1000;
-">
-  <button id="close-shop" style="float:right;">X</button>
-  <h2>Shop</h2>
-  <ul id="shop-items" style="list-style: none; padding-left: 0;"></ul>
-</div>
-
-<!-- Settings modal styling -->
-<div id="settings" class="modal hidden" style="
-  position: fixed;
-  top: 60px;
-  left: 20px;
-  width: 200px;
-  background: rgba(0,0,0,0.85);
-  color: white;
-  padding: 15px;
-  border-radius: 10px;
-  z-index: 1000;
-">
-  <button id="close-settings" style="float:right;">X</button>
-  <h2>Settings</h2>
-  <label><input type="checkbox" id="toggle-sound" checked> Geluid aan</label>
-</div>
-
-
-  <script src="game.js"></script>
-</body>
-</html>
+    function spawnPowerUp() {
+      const types = ["speed", "invisibility"];
+      const type = types[Math.floor(Math.random() * types.length)];
+      powerUps.push({
+        x: Math.random() *
