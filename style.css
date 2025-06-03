@@ -106,6 +106,9 @@ button {
 
 /* Modal vensters */
 .modal {
+  display: block;
+  opacity: 0;
+  pointer-events: none;
   position: fixed;
   top: 50%;
   left: 50%;
@@ -123,8 +126,8 @@ button {
 }
 
 .modal.visible {
-  display: block;
   opacity: 1;
+  pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
 }
 

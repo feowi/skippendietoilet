@@ -1,77 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <title>Volledige Game</title>
-  <style>
-    canvas {
-      display: block;
-      margin: 0 auto;
-      background: #87CEEB; /* dagkleur */
-    }
-    body {
-      background: black;
-      color: white;
-      text-align: center;
-      font-family: sans-serif;
-    }
-  </style>
+  <title>SkippendieToilet Game</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Volledige Game</h1>
+  <div id="ui">
+    <div id="score">Score: 0</div>
+    <div id="level">Level: 1</div>
+    <div id="coins">Coins: 0</div>
+    <div id="health-container">
+      <span>Health:</span>
+      <div id="health-bar">
+        <div id="health-fill" style="width:100%"></div>
+      </div>
+      <span id="health-text">3</span>
+    </div>
+    <button id="shop-btn">Shop</button>
+    <button id="settings-btn">Settings</button>
+  </div>
   <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <!-- Shop Modal -->
+  <div class="modal" id="shop-modal">
+    <h2>Shop</h2>
+    <ul id="shop-items">
+      <li>Extra Life <span>10 coins</span></li>
+      <li>Shield <span>8 coins</span></li>
+      <li>Random Skin <span>5 coins</span></li>
+    </ul>
+    <button id="close-shop">Close</button>
+  </div>
+  <!-- Settings Modal -->
+  <div class="modal" id="settings-modal">
+    <h2>Settings</h2>
+    <div>
+      <label>
+        <input type="checkbox" id="music-toggle" checked>
+        Muziek aan/uit
+      </label>
+    </div>
+    <button id="close-settings">Close</button>
+  </div>
+  <div id="shopMessage"></div>
+  <script src="game.js"></script>
   <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-
-    let keys = {};
-    let mouseX = 0;
-    let mouseY = 0;
-
-    document.addEventListener("keydown", (e) => keys[e.key] = true);
-    document.addEventListener("keyup", (e) => keys[e.key] = false);
-    canvas.addEventListener("mousemove", (e) => {
-      const rect = canvas.getBoundingClientRect();
-      mouseX = e.clientX - rect.left;
-      mouseY = e.clientY - rect.top;
-    });
-    canvas.addEventListener("click", () => activatePowerUp());
-
-    const player = {
-      x: 400,
-      y: 300,
-      size: 20,
-      color: "lime",
-      speed: 3,
-      baseSpeed: 3,
-      lives: 3,
-      score: 0,
-      invisible: false,
-      invisibleTimer: 0
-    };
-
-    const enemies = [];
-    const powerUps = [];
-
-    const gameSettings = {
-      isNight: false,
-      dayNightTimer: 0,
-      dayNightInterval: 1000 * 10, // 10 sec
-    };
-
-    function spawnEnemy() {
-      enemies.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: 20,
-        speed: 1.5 + Math.random(),
-        color: gameSettings.isNight ? "purple" : "red",
-        isBoss: gameSettings.isNight && Math.random() < 0.1
-      });
+    // UI updates vanuit game.js
+    function updateUI(score, level, coins, lives) {
+      document.getElementById('score').textContent = 'Score: ' + score;
+      document.getElementById('level').textContent = 'Level: ' + level;
+      document.getElementById('coins').textContent = 'Coins: ' + coins;
+      document.getElementById('health-text').textContent = lives;
+      document.getElementById('health-fill').style.width = (lives * 33.33) + '%';
     }
 
-    function spawnPowerUp() {
-      const types = ["speed", "invisibility"];
-      const type = types[Math.floor(Math.random() * types.length)];
-      powerUps.push({
-        x: Math.random() *
+    // Shop/modal logica
+    const shopBtn = document.getElementById('shop-btn');
+    const shopModal = document.getElementById('shop-modal');
+    const closeShop = document.getElementById('close-shop');
+    shopBtn.onclick = () => shopModal.classList.add('visible');
+    closeShop.onclick = () => shopModal.classList.remove('visible');
+
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettings = document.getElementById('close-settings');
+    settingsBtn.onclick = () => settingsModal.classList.add('visible');
+    closeSettings.onclick = () => settingsModal.classList.remove('visible');
+
+    // Muziek toggle
+    document.getElementById('music-toggle').onchange = function() {
+      if (window.bgMusic) window.bgMusic.muted = !this.checked;
+    };
+
+    // Shop aankopen (dummy, koppel aan game.js indien gewenst)
+    document.getElementById('shop-items').onclick = function(e) {
+      if (e.target.tagName === 'LI' || e.target.parentElement.tagName === 'LI') {
+        document.getElementById('shopMessage').textContent = 'Koop gedaan!';
+        document.getElementById('shopMessage').style.display = 'block';
+        setTimeout(() => document.getElementById('shopMessage').style.display = 'none', 1200);
+      }
+    };
+  </script>
+</body>
+</html>

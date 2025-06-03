@@ -36,6 +36,7 @@ const shootSound = new Audio('sounds/shoot.wav');
 const hitSound = new Audio('sounds/hit.wav');
 const powerUpSound = new Audio('sounds/powerup.wav');
 const bgMusic = new Audio('sounds/music.mp3');
+window.bgMusic = bgMusic; // Voor settings toggle
 bgMusic.loop = true;
 bgMusic.volume = 0.3;
 bgMusic.play();
@@ -347,6 +348,11 @@ function update() {
   if (randomEventActive) {
     randomEventTimer--;
     if (randomEventTimer <= 0) randomEventActive = false;
+  }
+
+  // UI bijwerken
+  if (typeof updateUI === 'function') {
+    updateUI(player.score, level, coins, player.lives);
   }
 }
 
