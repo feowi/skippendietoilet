@@ -5,7 +5,9 @@ const ctx = canvas.getContext('2d');
 canvas.width = 800;
 canvas.height = 600;
 
-let player = { x: 400, y: 300, size: 20, speed: 5, score: 0, lives: 3 };
+const world = { width: 2400, height: 1800 };
+
+let player = { x: world.width / 2, y: world.height / 2, size: 20, speed: 5, score: 0, lives: 3, vx: 0, vy: 0 };
 let bullets = [];
 let enemies = [];
 let powerUps = [];
@@ -74,10 +76,11 @@ let equippedTrail = null;
 
 // --- Camera/wereld offset zodat speler altijd in het midden ---
 function getCameraOffset() {
-  return {
-    x: player.x - canvas.width / 2,
-    y: player.y - canvas.height / 2
-  };
+  let camX = player.x - canvas.width / 2;
+  let camY = player.y - canvas.height / 2;
+  camX = Math.max(0, Math.min(camX, world.width - canvas.width));
+  camY = Math.max(0, Math.min(camY, world.height - canvas.height));
+  return { x: camX, y: camY };
 }
 
 // --- Draw player in center, rest met offset ---
@@ -321,8 +324,8 @@ function spawnPowerUp() {
   else if (r < 0.45) type = 'skin';
   else if (r < 0.55) type = 'doubleScore';
   else if (r < 0.65) type = 'speedBoost';
-  powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type });
-  if (Math.random() < 0.1) powerUps.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, type: 'mystery' });
+  powerUps.push({ x: Math.random() * world.width, y: Math.random() * world.height, type });
+  if (Math.random() < 0.1) powerUps.push({ x: Math.random() * world.width, y: Math.random() * world.height, type: 'mystery' });
 }
 
 // --- Mystery box effect ---
@@ -560,6 +563,7 @@ function update() {
     return;
   }
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  updatePlayerMovement();
   drawDayNightCycle();
   drawWeather();
   drawPlayer();
@@ -569,9 +573,12 @@ function update() {
   drawBosses();
   drawPortals();
   drawHUD();
+  drawMinimap();
+  drawBoostBar();
   moveBullets();
   moveEnemies();
   checkCollisions();
+  updateWeapons();
   if (enemies.length === 0 && bosses.length === 0) nextLevel();
 
   // Combo timer
@@ -728,25 +735,80 @@ addEventListener('keydown', e => {
 
 // Shop functionaliteit
 if (typeof document !== "undefined") {
-  document.getElementById('shop-items').onclick = function(e) {
+  const shopList = document.getElementById('shop-items');
+  // Dynamisch vullen
+  if (shopList && shopList.children.length < shopItems.length) {
+    shopList.innerHTML = '';
+    shopItems.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item.name;
+      const span = document.createElement('span');
+      span.textContent = item.cost + " coins";
+      li.appendChild(span);
+      shopList.appendChild(li);
+    });
+  }
+  shopList.onclick = function(e) {
     let li = e.target.tagName === 'LI' ? e.target : e.target.closest('li');
     if (!li) return;
-    let text = li.textContent;
-    if (text.includes('Extra Life') && coins >= 10) {
-      player.lives++;
-      coins -= 10;
-    }
-    if (text.includes('Shield') && coins >= 8) {
-      shieldActive = true;
-      shieldTimer = 300;
-      coins -= 8;
-    }
-    if (text.includes('Random Skin') && coins >= 5) {
-      currentSkin = Math.floor(Math.random() * skins.length);
-      coins -= 5;
-    }
-    if (typeof updateUI === 'function') {
-      updateUI(player.score, level, coins, player.lives, xp, xpToNext, playerLevel);
+    let idx = Array.from(shopList.children).indexOf(li);
+    let item = shopItems[idx];
+    if (coins >= item.cost) {
+      coins -= item.cost;
+      item.buy();
+      if (typeof updateUI === 'function') updateUI(player.score, level, coins, player.lives, xp, xpToNext, playerLevel);
     }
   };
+}
+
+// Boost bar in UI
+function drawBoostBar() {
+  const bx = 20, by = canvas.height - 40, bw = 220, bh = 18;
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = "#333";
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.globalAlpha = 1;
+  if (speedBoost) {
+    ctx.fillStyle = "#0ff";
+    ctx.fillRect(bx, by, bw * (speedBoostTimer / 400), bh);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("Speed Boost", bx + 10, by + 14);
+  } else if (doubleScore) {
+    ctx.fillStyle = "#ff0";
+    ctx.fillRect(bx, by, bw * (doubleScoreTimer / 400), bh);
+    ctx.fillStyle = "#222";
+    ctx.fillText("Double Score", bx + 10, by + 14);
+  }
+  ctx.restore();
+}
+
+// Minimap
+function drawMinimap() {
+  const mw = 180, mh = 135, mx = canvas.width - mw - 18, my = 18;
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = "#222";
+  ctx.fillRect(mx, my, mw, mh);
+  ctx.globalAlpha = 1;
+  // Player
+  ctx.fillStyle = "#0ff";
+  ctx.beginPath();
+  ctx.arc(mx + (player.x / world.width) * mw, my + (player.y / world.height) * mh, 6, 0, Math.PI * 2);
+  ctx.fill();
+  // Enemies
+  ctx.fillStyle = "#f44";
+  enemies.forEach(e => {
+    ctx.beginPath();
+    ctx.arc(mx + (e.x / world.width) * mw, my + (e.y / world.height) * mh, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  // Portals
+  ctx.fillStyle = "#ff0";
+  portals.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(mx + (p.x / world.width) * mw, my + (p.y / world.height) * mh, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
 }
